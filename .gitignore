@@ -2,4 +2,6 @@ echo "node_modules/
 .env
 .DS_Store
 dist/
-.vscode/" > .gitignore
+.vscode/
+node_modules/
+FRONT/node_modules/" > .gitignore
