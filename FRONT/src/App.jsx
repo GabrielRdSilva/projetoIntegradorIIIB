@@ -34,7 +34,7 @@ function App() {
   const [produto, setProduto] = useState({
     CodigoProd: '', CodigoForn: '', FornecedorNome: '', LocalForn: '',
     TipoProd: '', DescricaoProd: '', MaterialProd: '', QuantidadeProd: '',
-    ValorOriginalProd: '', DescontoAplicadoProd: '', EmbalagemProd: 'não',
+    ValorOriginalProd: '', DescontoAplicadoProd: 0, EmbalagemProd: 'não',
     CustoProd: 0, ValorEmbalagemProd: 0, CustoTotalProd: 0,
     PorcentagemAcrescidaProd: '', ValorSugeridoProd: 0, ValorCorrigidoProd: '',
     PorcentagemLucroProd: 0, LucroProd: 0
@@ -134,7 +134,7 @@ function App() {
                 <Input label="Material" name="MaterialProd" value={produto.MaterialProd} onChange={handleChange} />
                 <Input label="Quantidade" type="number" name="QuantidadeProd" value={produto.QuantidadeProd} onChange={handleChange} />
                 <Input label="Preço Original (R$)" type="number" name="ValorOriginalProd" value={produto.ValorOriginalProd} onChange={handleChange} />
-                <Input label="Desconto (%)" type="number" name="DescontoAppliedProd" value={produto.DescontoAplicadoProd} onChange={handleChange} />
+                <Input label="Desconto (%)" type="number" name="DescontoAplicadoProd" value={produto.DescontoAplicadoProd} onChange={handleChange} />
                 
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-bold text-slate-700">Embalagem?</label>
