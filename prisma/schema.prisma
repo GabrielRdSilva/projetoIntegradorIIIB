@@ -1,0 +1,81 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+// Configuração do Prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// Modelo de Clientes
+model cliente {
+  id         String  @id @default(auto()) @map("_id") @db.ObjectId
+  codCliente String  @unique
+  Nome       String
+  Email      String?
+  Referencia String?
+  Endereco   String?
+  Contato    Int?
+}
+
+// Modelo de Produtos
+model produto {
+  CodigoProd               String @unique
+  CodigoForn               String
+  FornecedorNome           String
+  LocalForn                String
+  TipoProd                 String
+  DescricaoProd            String
+  MaterialProd             String
+  QuantidadeProd           Int
+  ValorOriginalProd        Float
+  DescontoAplicadoProd     Float? @default(0)
+  EmbalagemProd            String
+  CustoProd                Float
+  ValorEmbalagemProd       Float
+  CustoTotalProd           Float
+  PorcentagemAcrescidaProd Float
+  ValorSugeridoProd        Float
+  ValorCorrigidoProd       Float
+  PorcentagemLucroProd     Float
+  LucroProd                Float
+  id                       String @id @default(auto()) @map("_id") @db.ObjectId
+}
+
+// Modelo de Vendas
+model venda {
+  id                     String   @id @default(auto()) @map("_id") @db.ObjectId
+  DataVenda              DateTime @default(now())
+  CodigoVenda            String   @unique
+  VendedorVenda          String
+  TipoVenda              String
+  CodigoCliente          String
+  ReferenciaCliente      String
+  NomeCliente            String
+  ValorVenda             Float
+  DescontoConcedidoVenda Float?   @default(0)
+  TotalVenda             Float
+
+}
+
+// Modelo de Detalhes da Venda
+model detalheVenda {
+  id                       String   @id @default(auto()) @map("_id") @db.ObjectId
+  CodigoVendaDet           String
+  DataVendaDet             DateTime
+  CodigoProdVendaDet       String
+  TipoProdutoVendaDet      String
+  MaterialVendaDet         String
+  DescricaoProdutoVendaDet String
+  QuantidadeVendaDet       Int
+  ValorUnitarioVendaDet    Float
+  TotalVendaVendaDet       Float
+
+}
