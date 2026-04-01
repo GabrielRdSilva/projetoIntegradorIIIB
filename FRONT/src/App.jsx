@@ -6,9 +6,9 @@ import Sidebar from './components/Sidebar'
 const Input = ({ label, ...props }) => (
   <div className="flex flex-col gap-1">
     <label className="text-sm font-bold text-slate-700">{label}</label>
-    <input 
-      {...props} 
-      className="border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all hover:border-emerald-300 bg-slate-50/50" 
+    <input
+      {...props}
+      className="border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all hover:border-emerald-300 bg-slate-50/50"
     />
   </div>
 )
@@ -20,8 +20,8 @@ const Button = ({ children, variant = 'primary', ...props }) => {
     secondary: 'bg-slate-200 hover:bg-slate-300 text-slate-700'
   }
   return (
-    <button 
-      {...props} 
+    <button
+      {...props}
       className={`${variants[variant]} font-semibold py-2.5 px-5 rounded-xl shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2`}
     >
       {children}
@@ -40,6 +40,75 @@ function App() {
     PorcentagemLucroProd: 0, LucroProd: 0
   })
 
+  const [venda, setVenda] = useState({
+    DataVenda: new Date().toISOString().split('T')[0], // Data de hoje como padrão
+    CodigoVenda: '',
+    VendedorVenda: 'Gabriel Rodrigues',
+    TipoVenda: 'Avista',
+    CodigoCliente: '',
+    ReferenciaCliente: '',
+    NomeCliente: '',
+    ValorVenda: 0,
+    DescontoConcedidoVenda: 0,
+    TotalVenda: 0
+  })
+
+  const [buscaCliente, setBuscaCliente] = useState('')
+  const [clientesFiltrados, setClientesFiltrados] = useState([])
+
+  /*const selecionarCliente = (cliente) => {
+    setVenda({
+      ...venda,
+      CodigoCliente: cliente.codCliente,
+      ReferenciaCliente: cliente.Referencia,
+      NomeCliente: cliente.Nome
+    })
+    setBuscaCliente(cliente.Nome)
+    setClientesFiltrados([]) // Limpa a lista após selecionar
+  }*/
+  // --- FUNÇÃO PARA BUSCAR CLIENTES NO BANCO ---
+  useEffect(() => {
+    if (venda.DataVenda && venda.CodigoCliente) {
+      // 1. Extrair Dia e Mês da DataVenda (formato YYYY-MM-DD)
+      const [ano, mes, dia] = venda.DataVenda.split('-')
+
+      // 2. Pegar os 4 últimos dígitos do Código do Cliente
+      const ultimosDigitosCliente = venda.CodigoCliente.slice(-4)
+
+      // 3. Montar o código: VENDA - DIA + MES / 4_DIGITOS
+      // Exemplo: 10/02 -> 102 (dia + primeiro digito do mes ou similar conforme sua regra)
+      // Pela sua regra: "10" + "2" (de 02) = 102
+      const mesSimplificado = parseInt(mes).toString() // Remove o zero à esquerda (02 -> 2)
+      const novoCodigo = `VENDA - ${dia}${mesSimplificado}/${ultimosDigitosCliente}`
+    }
+    setVenda(prev => ({ ...prev, CodigoVenda: novoCodigo }))
+    const buscarClientes = async () => {
+      if (buscaCliente.length > 2) { // Só busca se digitar mais de 2 letras
+        try {
+          const response = await axios.get(`http://localhost:3000/clientes?Nome=${buscaCliente}`)
+          setClientesFiltrados(response.data)
+        } catch (error) {
+          console.error("Erro ao buscar clientes:", error)
+        }
+      } else {
+        setClientesFiltrados([]) // Limpa a lista se apagar o texto
+      }
+    }
+    buscarClientes()
+  }, [buscaCliente, venda.DataVenda, venda.CodigoCliente])
+
+  // --- FUNÇÃO PARA SELECIONAR O CLIENTE DA LISTA ---
+  const selecionarCliente = (cliente) => {
+    setVenda({
+      ...venda,
+      CodigoCliente: cliente.codCliente,
+      ReferenciaCliente: cliente.Referencia,
+      NomeCliente: cliente.Nome
+    })
+    setBuscaCliente(cliente.Nome) // Coloca o nome no campo de busca
+    setClientesFiltrados([]) // Esconde a lista de sugestões
+  }
+
   // Lógica de Cálculos Automáticos
   useEffect(() => {
     const valorOriginal = parseFloat(produto.ValorOriginalProd) || 0
@@ -51,7 +120,7 @@ function App() {
     const valorEmbalagem = produto.EmbalagemProd === 'sim' ? 2.5 : 0
     const custoTotal = custoProd + valorEmbalagem
     const valorSugerido = custoTotal * (1 + acrescimo)
-    
+
     const lucroProd = valorCorrigido - custoTotal
     const porcLucro = valorCorrigido > 0 ? (1 - (custoTotal / valorCorrigido)) * 100 : 0
 
@@ -74,7 +143,7 @@ function App() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      await axios.post('http://localhost:3000/Produtos', produto )
+      await axios.post('http://localhost:3000/Produtos', produto)
       alert('✅ Produto cadastrado com sucesso!')
       setTelaAtiva('home')
     } catch (error) {
@@ -87,7 +156,7 @@ function App() {
     <div className="flex bg-slate-50 min-h-screen font-sans text-slate-900">
       {/* Menu Lateral */}
       <Sidebar setTela={setTelaAtiva} />
-      
+
       {/* Área Principal */}
       <main className="flex-1 ml-64 p-8">
         <header className="flex justify-between items-center mb-10 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
@@ -120,12 +189,91 @@ function App() {
               </div>
             </div>
           )}
+          {telaAtiva === 'venda' && (
+            <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+              <form className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <h2 className="col-span-full text-xl font-bold text-slate-800 border-b pb-4 mb-2">Lançar Nova Venda</h2>
+
+                {/* Dados da Venda */}
+                <Input label="Data da Venda" type="date" name="DataVenda" value={venda.DataVenda} onChange={(e) => setVenda({ ...venda, DataVenda: e.target.value })} />
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-bold text-slate-700">Vendedor</label>
+                  <select name="VendedorVenda" value={venda.VendedorVenda} onChange={(e) => setVenda({ ...venda, VendedorVenda: e.target.value })} className="border border-slate-200 p-2.5 rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500">
+                    <option value="Gabriel Rodrigues">Gabriel Rodrigues</option>
+                    <option value="Natalia Almeida">Natalia Almeida</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-bold text-slate-700">Tipo de Venda</label>
+                  <select name="TipoVenda" value={venda.TipoVenda} onChange={(e) => setVenda({ ...venda, TipoVenda: e.target.value })} className="border border-slate-200 p-2.5 rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500">
+                    <option value="Avista">À Vista</option>
+                    <option value="A Prazo">A Prazo</option>
+                  </select>
+                </div>
+
+                <Input
+                  label="Cód. Venda (Automático)"
+                  name="CodigoVenda"
+                  value={venda.CodigoVenda}
+                  readOnly
+                  className="border border-slate-200 p-2.5 rounded-xl bg-slate-100 outline-none cursor-not-allowed"
+                />
+
+
+                {/* Campo de Busca (Substitua o bloco atual por este) */}
+                <div className="md:col-span-2 relative">
+                  <Input
+                    label="Buscar Cliente (Nome)"
+                    placeholder="Digite o nome para buscar..."
+                    value={buscaCliente}
+                    onChange={(e) => setBuscaCliente(e.target.value)}
+                  />
+
+                  {/* Lista de Sugestões Flutuante */}
+                  {clientesFiltrados.length > 0 && (
+                    <ul className="absolute z-10 w-full bg-white border border-slate-200 rounded-xl shadow-lg mt-1 max-h-40 overflow-y-auto">
+                      {clientesFiltrados.map((cliente) => (
+                        <li
+                          key={cliente.id}
+                          onClick={() => selecionarCliente(cliente)}
+                          className="p-3 hover:bg-emerald-50 cursor-pointer text-sm text-slate-700 border-b last:border-none border-slate-100 transition-colors"
+                        >
+                          <span className="font-bold">{cliente.codCliente}</span> - {cliente.Nome}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+
+                {/* Campos Automáticos do Cliente */}
+                <div className="col-span-full grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div className="flex flex-col"><span className="text-xs text-slate-400 font-bold uppercase">Cód. Cliente</span><span className="font-semibold">{venda.CodigoCliente || '-'}</span></div>
+                  <div className="flex flex-col"><span className="text-xs text-slate-400 font-bold uppercase">Referência</span><span className="font-semibold">{venda.ReferenciaCliente || '-'}</span></div>
+                  <div className="flex flex-col"><span className="text-xs text-slate-400 font-bold uppercase">Nome Selecionado</span><span className="font-semibold">{venda.NomeCliente || 'Nenhum cliente selecionado'}</span></div>
+                </div>
+
+                {/* Valores (Iniciam em 0) */}
+                <div className="col-span-full flex justify-end gap-8 pt-4 border-t border-slate-100">
+                  <div className="text-right"><p className="text-xs text-slate-400 font-bold uppercase">Valor Venda</p><p className="text-xl font-mono">R$ 0,00</p></div>
+                  <div className="text-right"><p className="text-xs text-slate-400 font-bold uppercase">Desconto</p><p className="text-xl font-mono text-red-500">R$ 0,00</p></div>
+                  <div className="text-right"><p className="text-xs text-slate-400 font-bold uppercase font-black">Total</p><p className="text-2xl font-mono font-bold text-emerald-600">R$ 0,00</p></div>
+                </div>
+
+                <div className="col-span-full mt-6">
+                  <Button variant="primary" className="w-full py-4 text-lg">Próximo Passo: Adicionar Itens</Button>
+                </div>
+              </form>
+            </div>
+          )}
 
           {telaAtiva === 'produto' && (
             <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
               <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <h2 className="col-span-full text-xl font-bold text-slate-800 border-b pb-4 mb-2">Novo Produto</h2>
-                
+
                 <Input label="Cód. Produto" name="CodigoProd" value={produto.CodigoProd} onChange={handleChange} />
                 <Input label="Cód. Fornecedor" name="CodigoForn" value={produto.CodigoForn} onChange={handleChange} />
                 <Input label="Fornecedor" name="FornecedorNome" value={produto.FornecedorNome} onChange={handleChange} />
@@ -135,7 +283,7 @@ function App() {
                 <Input label="Quantidade" type="number" name="QuantidadeProd" value={produto.QuantidadeProd} onChange={handleChange} />
                 <Input label="Preço Original (R$)" type="number" name="ValorOriginalProd" value={produto.ValorOriginalProd} onChange={handleChange} />
                 <Input label="Desconto (%)" type="number" name="DescontoAplicadoProd" value={produto.DescontoAplicadoProd} onChange={handleChange} />
-                
+
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-bold text-slate-700">Embalagem?</label>
                   <select name="EmbalagemProd" value={produto.EmbalagemProd} onChange={handleChange} className="border border-slate-200 p-2.5 rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500">
