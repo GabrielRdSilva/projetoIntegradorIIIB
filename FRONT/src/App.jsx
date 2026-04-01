@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import Sidebar from './components/Sidebar'
 
-// Componentes internos para manter o estilo minimalista
+// Componentes internos
 const Input = ({ label, ...props }) => (
   <div className="flex flex-col gap-1">
     <label className="text-sm font-bold text-slate-700">{label}</label>
     <input
       {...props}
-      className="border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all hover:border-emerald-300 bg-slate-50/50"
+      className={`border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all hover:border-emerald-300 bg-slate-50/50 ${props.readOnly ? 'bg-slate-100 cursor-not-allowed' : ''}`}
     />
   </div>
 )
@@ -20,10 +20,7 @@ const Button = ({ children, variant = 'primary', ...props }) => {
     secondary: 'bg-slate-200 hover:bg-slate-300 text-slate-700'
   }
   return (
-    <button
-      {...props}
-      className={`${variants[variant]} font-semibold py-2.5 px-5 rounded-xl shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2`}
-    >
+    <button {...props} className={`${variants[variant]} font-semibold py-2.5 px-5 rounded-xl shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2`}>
       {children}
     </button>
   )
@@ -31,17 +28,20 @@ const Button = ({ children, variant = 'primary', ...props }) => {
 
 function App() {
   const [telaAtiva, setTelaAtiva] = useState('home')
+  const [buscaCliente, setBuscaCliente] = useState('')
+  const [clientesFiltrados, setClientesFiltrados] = useState([])
+
   const [produto, setProduto] = useState({
     CodigoProd: '', CodigoForn: '', FornecedorNome: '', LocalForn: '',
     TipoProd: '', DescricaoProd: '', MaterialProd: '', QuantidadeProd: '',
-    ValorOriginalProd: '', DescontoAplicadoProd: 0, EmbalagemProd: 'não',
+    ValorOriginalProd: '', DescontoAplicadoProd: '', EmbalagemProd: 'não',
     CustoProd: 0, ValorEmbalagemProd: 0, CustoTotalProd: 0,
     PorcentagemAcrescidaProd: '', ValorSugeridoProd: 0, ValorCorrigidoProd: '',
     PorcentagemLucroProd: 0, LucroProd: 0
   })
 
   const [venda, setVenda] = useState({
-    DataVenda: new Date().toISOString().split('T')[0], // Data de hoje como padrão
+    DataVenda: new Date().toISOString().split('T')[0],
     CodigoVenda: '',
     VendedorVenda: 'Gabriel Rodrigues',
     TipoVenda: 'Avista',
@@ -52,64 +52,21 @@ function App() {
     DescontoConcedidoVenda: 0,
     TotalVenda: 0
   })
+  const [itensVenda, setItensVenda] = useState([]) // Lista de produtos adicionados
+  const [buscaProduto, setBuscaProduto] = useState('') // Texto da busca de produto
+  const [produtosFiltrados, setProdutosFiltrados] = useState([]) // Sugestões do banco
+  const [itemAtual, setItemAtual] = useState({
+    CodigoProdVendaDet: '',
+    QuantidadeVendaDet: 1,
+    ValorUnitarioVendaDet: 0,
+    TotalVendaVendaDet: 0,
+    // Campos que virão do produto selecionado:
+    TipoProdutoVendaDet: '',
+    MaterialVendaDet: '',
+    DescricaoProdutoVendaDet: ''
+  })
 
-  const [buscaCliente, setBuscaCliente] = useState('')
-  const [clientesFiltrados, setClientesFiltrados] = useState([])
-
-  /*const selecionarCliente = (cliente) => {
-    setVenda({
-      ...venda,
-      CodigoCliente: cliente.codCliente,
-      ReferenciaCliente: cliente.Referencia,
-      NomeCliente: cliente.Nome
-    })
-    setBuscaCliente(cliente.Nome)
-    setClientesFiltrados([]) // Limpa a lista após selecionar
-  }*/
-  // --- FUNÇÃO PARA BUSCAR CLIENTES NO BANCO ---
-  useEffect(() => {
-    if (venda.DataVenda && venda.CodigoCliente) {
-      // 1. Extrair Dia e Mês da DataVenda (formato YYYY-MM-DD)
-      const [ano, mes, dia] = venda.DataVenda.split('-')
-
-      // 2. Pegar os 4 últimos dígitos do Código do Cliente
-      const ultimosDigitosCliente = venda.CodigoCliente.slice(-4)
-
-      // 3. Montar o código: VENDA - DIA + MES / 4_DIGITOS
-      // Exemplo: 10/02 -> 102 (dia + primeiro digito do mes ou similar conforme sua regra)
-      // Pela sua regra: "10" + "2" (de 02) = 102
-      const mesSimplificado = parseInt(mes).toString() // Remove o zero à esquerda (02 -> 2)
-      const novoCodigo = `VENDA - ${dia}${mesSimplificado}/${ultimosDigitosCliente}`
-    }
-    setVenda(prev => ({ ...prev, CodigoVenda: novoCodigo }))
-    const buscarClientes = async () => {
-      if (buscaCliente.length > 2) { // Só busca se digitar mais de 2 letras
-        try {
-          const response = await axios.get(`http://localhost:3000/clientes?Nome=${buscaCliente}`)
-          setClientesFiltrados(response.data)
-        } catch (error) {
-          console.error("Erro ao buscar clientes:", error)
-        }
-      } else {
-        setClientesFiltrados([]) // Limpa a lista se apagar o texto
-      }
-    }
-    buscarClientes()
-  }, [buscaCliente, venda.DataVenda, venda.CodigoCliente])
-
-  // --- FUNÇÃO PARA SELECIONAR O CLIENTE DA LISTA ---
-  const selecionarCliente = (cliente) => {
-    setVenda({
-      ...venda,
-      CodigoCliente: cliente.codCliente,
-      ReferenciaCliente: cliente.Referencia,
-      NomeCliente: cliente.Nome
-    })
-    setBuscaCliente(cliente.Nome) // Coloca o nome no campo de busca
-    setClientesFiltrados([]) // Esconde a lista de sugestões
-  }
-
-  // Lógica de Cálculos Automáticos
+  // --- LÓGICA DE CÁLCULOS DO PRODUTO ---
   useEffect(() => {
     const valorOriginal = parseFloat(produto.ValorOriginalProd) || 0
     const desconto = (parseFloat(produto.DescontoAplicadoProd) || 0) / 100
@@ -135,29 +92,104 @@ function App() {
     }))
   }, [produto.ValorOriginalProd, produto.DescontoAplicadoProd, produto.EmbalagemProd, produto.PorcentagemAcrescidaProd, produto.ValorCorrigidoProd])
 
-  const handleChange = (e) => {
+  // --- LÓGICA DE GERAÇÃO DO CÓDIGO DA VENDA ---
+  useEffect(() => {
+    if (venda.DataVenda && venda.CodigoCliente) {
+      const dataParts = venda.DataVenda.split('-') // [YYYY, MM, DD]
+      const dia = dataParts[2]
+      const mes = parseInt(dataParts[1]).toString() // Remove zero à esquerda
+      const ultimosDigitos = venda.CodigoCliente.slice(-4)
+
+      const novoCodigo = `VENDA - ${dia}${mes}/${ultimosDigitos}`
+      if (venda.CodigoVenda !== novoCodigo) {
+        setVenda(prev => ({ ...prev, CodigoVenda: novoCodigo }))
+      }
+    }
+  }, [venda.DataVenda, venda.CodigoCliente])
+
+  // --- BUSCA DE CLIENTES ---
+  useEffect(() => {
+    const buscarClientes = async () => {
+      if (buscaCliente.length > 2) {
+        try {
+          const response = await axios.get(`http://localhost:3000/clientes?Nome=${buscaCliente}`)
+          setClientesFiltrados(response.data)
+        } catch (error) { console.error(error) }
+      } else { setClientesFiltrados([]) }
+    }
+    buscarClientes()
+  }, [buscaCliente])
+
+  const selecionarCliente = (cliente) => {
+    setVenda(prev => ({
+      ...prev,
+      CodigoCliente: cliente.codCliente,
+      ReferenciaCliente: cliente.Referencia,
+      NomeCliente: cliente.Nome
+    }))
+    setBuscaCliente(cliente.Nome)
+    setClientesFiltrados([])
+  }
+  // Busca produtos no banco enquanto digita
+  useEffect(() => {
+    const buscarProdutos = async () => {
+      if (buscaProduto.length > 1) {
+        try {
+          const response = await axios.get(`http://localhost:3000/Produtos?CodigoProd=${buscaProduto}`)
+          setProdutosFiltrados(response.data)
+        } catch (error) { console.error(error) }
+      } else { setProdutosFiltrados([]) }
+    }
+    buscarProdutos()
+  }, [buscaProduto])
+
+  // Ao clicar em um produto da lista de sugestões
+  const selecionarProduto = (prod) => {
+    setItemAtual({
+      ...itemAtual,
+      CodigoProdVendaDet: prod.CodigoProd,
+      ValorUnitarioVendaDet: prod.ValorCorrigidoProd, // Preço padrão de venda
+      TipoProdutoVendaDet: prod.TipoProd,
+      MaterialVendaDet: prod.MaterialProd,
+      DescricaoProdutoVendaDet: prod.DescricaoProd,
+      TotalVendaVendaDet: (1 * prod.ValorCorrigidoProd).toFixed(2)
+    })
+    setBuscaProduto(prod.CodigoProd)
+    setProdutosFiltrados([])
+  }
+
+  // Adiciona o item atual à lista da venda
+  const adicionarItem = () => {
+    if (!itemAtual.CodigoProdVendaDet) return alert("Selecione um produto primeiro!")
+
+    setItensVenda([...itensVenda, { ...itemAtual, idTemporario: Date.now() }])
+
+    // Limpa o campo para o próximo item
+    setItemAtual({
+      CodigoProdVendaDet: '', QuantidadeVendaDet: 1, ValorUnitarioVendaDet: 0,
+      TotalVendaVendaDet: 0, TipoProdutoVendaDet: '', MaterialVendaDet: '', DescricaoProdutoVendaDet: ''
+    })
+    setBuscaProduto('')
+  }
+
+  const handleChangeProduto = (e) => {
     const { name, value } = e.target
     setProduto(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = async (e) => {
+  const handleSubmitProduto = async (e) => {
     e.preventDefault()
     try {
       await axios.post('http://localhost:3000/Produtos', produto)
-      alert('✅ Produto cadastrado com sucesso!')
+      alert('✅ Produto cadastrado!')
       setTelaAtiva('home')
-    } catch (error) {
-      console.error(error)
-      alert('❌ Erro ao cadastrar. O servidor está ligado?')
-    }
+    } catch (error) { alert('❌ Erro ao cadastrar.') }
   }
 
   return (
     <div className="flex bg-slate-50 min-h-screen font-sans text-slate-900">
-      {/* Menu Lateral */}
       <Sidebar setTela={setTelaAtiva} />
 
-      {/* Área Principal */}
       <main className="flex-1 ml-64 p-8">
         <header className="flex justify-between items-center mb-10 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
           <div>
@@ -189,12 +221,53 @@ function App() {
               </div>
             </div>
           )}
+
+          {telaAtiva === 'produto' && (
+            <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+              <form onSubmit={handleSubmitProduto} className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <h2 className="col-span-full text-xl font-bold text-slate-800 border-b pb-4 mb-2">Novo Produto</h2>
+                <Input label="Cód. Produto" name="CodigoProd" value={produto.CodigoProd} onChange={handleChangeProduto} />
+                <Input label="Cód. Fornecedor" name="CodigoForn" value={produto.CodigoForn} onChange={handleChangeProduto} />
+                <Input label="Fornecedor" name="FornecedorNome" value={produto.FornecedorNome} onChange={handleChangeProduto} />
+                <Input label="Localidade" name="LocalForn" value={produto.LocalForn} onChange={handleChangeProduto} />
+                <Input label="Tipo" name="TipoProd" value={produto.TipoProd} onChange={handleChangeProduto} />
+                <Input label="Material" name="MaterialProd" value={produto.MaterialProd} onChange={handleChangeProduto} />
+                <Input label="Quantidade" type="number" name="QuantidadeProd" value={produto.QuantidadeProd} onChange={handleChangeProduto} />
+                <Input label="Preço Original (R$)" type="number" name="ValorOriginalProd" value={produto.ValorOriginalProd} onChange={handleChangeProduto} />
+                <Input label="Desconto (%)" type="number" name="DescontoAplicadoProd" value={produto.DescontoAplicadoProd} onChange={handleChangeProduto} />
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-bold text-slate-700">Embalagem?</label>
+                  <select name="EmbalagemProd" value={produto.EmbalagemProd} onChange={handleChangeProduto} className="border border-slate-200 p-2.5 rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500">
+                    <option value="não">Não</option>
+                    <option value="sim">Sim</option>
+                  </select>
+                </div>
+
+                <Input label="% Acréscimo" type="number" name="PorcentagemAcrescidaProd" value={produto.PorcentagemAcrescidaProd} onChange={handleChangeProduto} />
+                <Input label="Preço de Venda (R$)" type="number" name="ValorCorrigidoProd" value={produto.ValorCorrigidoProd} onChange={handleChangeProduto} />
+
+                <div className="col-span-full grid grid-cols-2 md:grid-cols-6 gap-4 bg-emerald-50/50 p-6 rounded-3xl border border-emerald-100 mt-4 text-center">
+                  <div className="flex flex-col"><span className="text-[10px] text-emerald-600 font-bold uppercase tracking-tighter">Custo Líq.</span><span className="text-sm font-mono font-bold">R$ {produto.CustoProd}</span></div>
+                  <div className="flex flex-col"><span className="text-[10px] text-emerald-600 font-bold uppercase tracking-tighter">Embalagem</span><span className="text-sm font-mono font-bold">R$ {produto.ValorEmbalagemProd}</span></div>
+                  <div className="flex flex-col"><span className="text-[10px] text-emerald-600 font-bold uppercase tracking-tighter">Custo Total</span><span className="text-sm font-mono font-bold">R$ {produto.CustoTotalProd}</span></div>
+                  <div className="flex flex-col"><span className="text-[10px] text-blue-600 font-bold uppercase tracking-tighter">Sugestão</span><span className="text-sm font-mono font-bold text-blue-700">R$ {produto.ValorSugeridoProd}</span></div>
+                  <div className="flex flex-col"><span className="text-[10px] text-orange-600 font-bold uppercase tracking-tighter">Lucro</span><span className="text-sm font-mono font-bold text-orange-700">R$ {produto.LucroProd}</span></div>
+                  <div className="flex flex-col"><span className="text-[10px] text-orange-600 font-bold uppercase tracking-tighter">% Lucro</span><span className="text-sm font-mono font-bold text-orange-700">{produto.PorcentagemLucroProd}%</span></div>
+                </div>
+
+                <div className="col-span-full mt-6">
+                  <Button variant="success" type="submit" className="w-full py-4 text-lg">Cadastrar Produto</Button>
+                </div>
+              </form>
+            </div>
+          )}
+
           {telaAtiva === 'venda' && (
             <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
               <form className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <h2 className="col-span-full text-xl font-bold text-slate-800 border-b pb-4 mb-2">Lançar Nova Venda</h2>
 
-                {/* Dados da Venda */}
                 <Input label="Data da Venda" type="date" name="DataVenda" value={venda.DataVenda} onChange={(e) => setVenda({ ...venda, DataVenda: e.target.value })} />
 
                 <div className="flex flex-col gap-1">
@@ -212,17 +285,8 @@ function App() {
                     <option value="A Prazo">A Prazo</option>
                   </select>
                 </div>
+                <Input label="Cód. Venda (Automático)" name="CodigoVenda" value={venda.CodigoVenda} readOnly />
 
-                <Input
-                  label="Cód. Venda (Automático)"
-                  name="CodigoVenda"
-                  value={venda.CodigoVenda}
-                  readOnly
-                  className="border border-slate-200 p-2.5 rounded-xl bg-slate-100 outline-none cursor-not-allowed"
-                />
-
-
-                {/* Campo de Busca (Substitua o bloco atual por este) */}
                 <div className="md:col-span-2 relative">
                   <Input
                     label="Buscar Cliente (Nome)"
@@ -230,16 +294,10 @@ function App() {
                     value={buscaCliente}
                     onChange={(e) => setBuscaCliente(e.target.value)}
                   />
-
-                  {/* Lista de Sugestões Flutuante */}
                   {clientesFiltrados.length > 0 && (
                     <ul className="absolute z-10 w-full bg-white border border-slate-200 rounded-xl shadow-lg mt-1 max-h-40 overflow-y-auto">
                       {clientesFiltrados.map((cliente) => (
-                        <li
-                          key={cliente.id}
-                          onClick={() => selecionarCliente(cliente)}
-                          className="p-3 hover:bg-emerald-50 cursor-pointer text-sm text-slate-700 border-b last:border-none border-slate-100 transition-colors"
-                        >
+                        <li key={cliente.id} onClick={() => selecionarCliente(cliente)} className="p-3 hover:bg-emerald-50 cursor-pointer text-sm text-slate-700 border-b last:border-none border-slate-100">
                           <span className="font-bold">{cliente.codCliente}</span> - {cliente.Nome}
                         </li>
                       ))}
@@ -247,66 +305,87 @@ function App() {
                   )}
                 </div>
 
-
-                {/* Campos Automáticos do Cliente */}
                 <div className="col-span-full grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200">
                   <div className="flex flex-col"><span className="text-xs text-slate-400 font-bold uppercase">Cód. Cliente</span><span className="font-semibold">{venda.CodigoCliente || '-'}</span></div>
                   <div className="flex flex-col"><span className="text-xs text-slate-400 font-bold uppercase">Referência</span><span className="font-semibold">{venda.ReferenciaCliente || '-'}</span></div>
                   <div className="flex flex-col"><span className="text-xs text-slate-400 font-bold uppercase">Nome Selecionado</span><span className="font-semibold">{venda.NomeCliente || 'Nenhum cliente selecionado'}</span></div>
                 </div>
 
-                {/* Valores (Iniciam em 0) */}
-                <div className="col-span-full flex justify-end gap-8 pt-4 border-t border-slate-100">
-                  <div className="text-right"><p className="text-xs text-slate-400 font-bold uppercase">Valor Venda</p><p className="text-xl font-mono">R$ 0,00</p></div>
-                  <div className="text-right"><p className="text-xs text-slate-400 font-bold uppercase">Desconto</p><p className="text-xl font-mono text-red-500">R$ 0,00</p></div>
-                  <div className="text-right"><p className="text-xs text-slate-400 font-bold uppercase font-black">Total</p><p className="text-2xl font-mono font-bold text-emerald-600">R$ 0,00</p></div>
-                </div>
-
                 <div className="col-span-full mt-6">
                   <Button variant="primary" className="w-full py-4 text-lg">Próximo Passo: Adicionar Itens</Button>
                 </div>
-              </form>
-            </div>
-          )}
+                {/* SEÇÃO DE ADIÇÃO DE PRODUTOS */}
+                <div className="col-span-full mt-8 border-t pt-8">
+                  <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <span className="bg-emerald-100 text-emerald-600 w-6 h-6 rounded-full flex items-center justify-center text-xs">2</span>
+                    Itens da Venda
+                  </h3>
 
-          {telaAtiva === 'produto' && (
-            <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
-              <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <h2 className="col-span-full text-xl font-bold text-slate-800 border-b pb-4 mb-2">Novo Produto</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                    <div className="md:col-span-1 relative">
+                      <Input
+                        label="Buscar Produto (Cód)"
+                        placeholder="Ex: NAS-001"
+                        value={buscaProduto}
+                        onChange={(e) => setBuscaProduto(e.target.value)}
+                      />
+                      {produtosFiltrados.length > 0 && (
+                        <ul className="absolute z-20 w-full bg-white border border-slate-200 rounded-xl shadow-lg mt-1 max-h-40 overflow-y-auto">
+                          {produtosFiltrados.map((p) => (
+                            <li key={p.id} onClick={() => selecionarProduto(p)} className="p-3 hover:bg-emerald-50 cursor-pointer text-sm border-b last:border-none border-slate-100">
+                              <span className="font-bold">{p.CodigoProd}</span> - {p.DescricaoProd}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
 
-                <Input label="Cód. Produto" name="CodigoProd" value={produto.CodigoProd} onChange={handleChange} />
-                <Input label="Cód. Fornecedor" name="CodigoForn" value={produto.CodigoForn} onChange={handleChange} />
-                <Input label="Fornecedor" name="FornecedorNome" value={produto.FornecedorNome} onChange={handleChange} />
-                <Input label="Localidade" name="LocalForn" value={produto.LocalForn} onChange={handleChange} />
-                <Input label="Tipo" name="TipoProd" value={produto.TipoProd} onChange={handleChange} />
-                <Input label="Material" name="MaterialProd" value={produto.MaterialProd} onChange={handleChange} />
-                <Input label="Quantidade" type="number" name="QuantidadeProd" value={produto.QuantidadeProd} onChange={handleChange} />
-                <Input label="Preço Original (R$)" type="number" name="ValorOriginalProd" value={produto.ValorOriginalProd} onChange={handleChange} />
-                <Input label="Desconto (%)" type="number" name="DescontoAplicadoProd" value={produto.DescontoAplicadoProd} onChange={handleChange} />
+                    <Input
+                      label="Qtd" type="number"
+                      value={itemAtual.QuantidadeVendaDet}
+                      onChange={(e) => setItemAtual({ ...itemAtual, QuantidadeVendaDet: e.target.value, TotalVendaVendaDet: (e.target.value * itemAtual.ValorUnitarioVendaDet).toFixed(2) })}
+                    />
 
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-bold text-slate-700">Embalagem?</label>
-                  <select name="EmbalagemProd" value={produto.EmbalagemProd} onChange={handleChange} className="border border-slate-200 p-2.5 rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500">
-                    <option value="não">Não</option>
-                    <option value="sim">Sim</option>
-                  </select>
+                    <Input
+                      label="Valor Unit. (R$)" type="number"
+                      value={itemAtual.ValorUnitarioVendaDet}
+                      onChange={(e) => setItemAtual({ ...itemAtual, ValorUnitarioVendaDet: e.target.value, TotalVendaVendaDet: (e.target.value * itemAtual.QuantidadeVendaDet).toFixed(2) })}
+                    />
+
+                    <Button variant="success" type="button" onClick={adicionarItem}>+ Adicionar Item</Button>
+                  </div>
+
+                  {/* TABELA DE ITENS ADICIONADOS */}
+                  {itensVenda.length > 0 && (
+                    <div className="mt-6 overflow-hidden border border-slate-200 rounded-2xl">
+                      <table className="w-full text-left border-collapse">
+                        <thead className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                          <tr>
+                            <th className="p-4">Produto</th>
+                            <th className="p-4">Qtd</th>
+                            <th className="p-4">Unitário</th>
+                            <th className="p-4">Total</th>
+                            <th className="p-4">Ação</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {itensVenda.map((item) => (
+                            <tr key={item.idTemporario} className="text-sm text-slate-700 hover:bg-slate-50">
+                              <td className="p-4 font-bold">{item.CodigoProdVendaDet} <span className="block font-normal text-xs text-slate-400">{item.DescricaoProdutoVendaDet}</span></td>
+                              <td className="p-4">{item.QuantidadeVendaDet}</td>
+                              <td className="p-4">R$ {item.ValorUnitarioVendaDet}</td>
+                              <td className="p-4 font-bold">R$ {item.TotalVendaVendaDet}</td>
+                              <td className="p-4">
+                                <button onClick={() => setItensVenda(itensVenda.filter(i => i.idTemporario !== item.idTemporario))} className="text-red-500 hover:text-red-700 font-bold">Remover</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
 
-                <Input label="% Acréscimo" type="number" name="PorcentagemAcrescidaProd" value={produto.PorcentagemAcrescidaProd} onChange={handleChange} />
-                <Input label="Preço de Venda (R$)" type="number" name="ValorCorrigidoProd" value={produto.ValorCorrigidoProd} onChange={handleChange} />
-
-                <div className="col-span-full grid grid-cols-2 md:grid-cols-6 gap-4 bg-emerald-50/50 p-6 rounded-3xl border border-emerald-100 mt-4 text-center">
-                  <div className="flex flex-col"><span className="text-[10px] text-emerald-600 font-bold uppercase tracking-tighter">Custo Líq.</span><span className="text-sm font-mono font-bold">R$ {produto.CustoProd}</span></div>
-                  <div className="flex flex-col"><span className="text-[10px] text-emerald-600 font-bold uppercase tracking-tighter">Embalagem</span><span className="text-sm font-mono font-bold">R$ {produto.ValorEmbalagemProd}</span></div>
-                  <div className="flex flex-col"><span className="text-[10px] text-emerald-600 font-bold uppercase tracking-tighter">Custo Total</span><span className="text-sm font-mono font-bold">R$ {produto.CustoTotalProd}</span></div>
-                  <div className="flex flex-col"><span className="text-[10px] text-blue-600 font-bold uppercase tracking-tighter">Sugestão</span><span className="text-sm font-mono font-bold text-blue-700">R$ {produto.ValorSugeridoProd}</span></div>
-                  <div className="flex flex-col"><span className="text-[10px] text-orange-600 font-bold uppercase tracking-tighter">Lucro</span><span className="text-sm font-mono font-bold text-orange-700">R$ {produto.LucroProd}</span></div>
-                  <div className="flex flex-col"><span className="text-[10px] text-orange-600 font-bold uppercase tracking-tighter">% Lucro</span><span className="text-sm font-mono font-bold text-orange-700">{produto.PorcentagemLucroProd}%</span></div>
-                </div>
-
-                <div className="col-span-full mt-6">
-                  <Button variant="success" type="submit" className="w-full py-4 text-lg">Cadastrar Produto</Button>
-                </div>
               </form>
             </div>
           )}
