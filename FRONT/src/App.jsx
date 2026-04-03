@@ -5,7 +5,7 @@ import Button from "./components/Button";
 import Dashboard from "./pages/Dashboard";
 import TelaProduto from "./pages/TelaProduto";
 import TelaVenda from "./pages/TelaVenda";
-
+import TelaCliente from "./pages/TelaCliente"; // ADICIONE ESTA LINHA
 
 function App() {
   const [telaAtiva, setTelaAtiva] = useState('home')
@@ -41,18 +41,69 @@ function App() {
     CodigoCliente: '', ReferenciaCliente: '', NomeCliente: '',
     ValorVenda: 0, DescontoConcedidoVenda: 0, TotalVenda: 0
   })
+  // 1. Estado Inicial Ajustado
+  const [novoCliente, setNovoCliente] = useState({
+    codCliente: `CLIEN-${Math.floor(1000 + Math.random() * 9000)}`,
+    Nome: '',
+    Email: '',
+    Referencia: '',
+    Endereco: '',
+    Contato: '' // Será convertido para Int no envio
+  });
+    const buscarProximoCodigoCliente = async () => {
+    try {
+      const response = await axios.get('http://localhost:3000/clientes/proximo-codigo' );
+      setNovoCliente(prev => ({ ...prev, codCliente: response.data.proximoCodigo }));
+    } catch (error) {
+      console.error("Erro ao buscar próximo código:", error);
+    }
+  };
+
+  // Dispara a busca quando a tela de cliente for ativada
+  useEffect(() => {
+    if (telaAtiva === 'cliente') {
+      buscarProximoCodigoCliente();
+    }
+  }, [telaAtiva]);
+
+    const handleSalvarCliente = async (e) => {
+    e.preventDefault();
+    try {
+      const dadosParaEnviar = {
+        ...novoCliente,
+        Contato: parseInt(novoCliente.Contato, 10) || 0
+      };
+
+      await axios.post('http://localhost:3000/clientes', dadosParaEnviar );
+      alert('✅ Cliente gravado com sucesso!');
+      
+      // Busca o próximo código para o próximo cadastro
+      await buscarProximoCodigoCliente();
+      
+      // Limpa apenas os campos de texto, mantendo o novo código
+      setNovoCliente(prev => ({
+        ...prev,
+        Nome: '', Email: '', Referencia: '', Endereco: '', Contato: ''
+      }));
+      
+      setTelaAtiva('home');
+    } catch (error) {
+      alert('❌ Erro ao gravar cliente: ' + error.message);
+    }
+  };
 
 
-    const gerarFinanceiro = () => {
+
+  const gerarFinanceiro = () => {
     // 1. Calcula o Total da Venda
     const subtotal = itensVenda.reduce((acc, item) => acc + (parseFloat(item.TotalVendaVendaDet) || 0), 0);
     const desconto = parseFloat(venda.DescontoConcedidoVenda) || 0;
     const totalVenda = subtotal - desconto;
-    
+
     // 2. Define o Valor da Entrada (se houver)
     const valorEntrada = temEntrada ? parseFloat(dadosEntrada.valor) : 0;
     const valorParaParcelar = totalVenda - valorEntrada;
-    
+
     if (valorParaParcelar < 0) {
       alert("❌ O valor da entrada não pode ser maior que o total da venda!");
       return;
@@ -60,7 +111,7 @@ function App() {
 
     const novasParcelas = [];
     const totalParcelasDesejadas = parseInt(numeroParcelas) || 1;
-    
+
     // 3. Adiciona a Entrada como Parcela #1 (se houver)
     if (temEntrada) {
       novasParcelas.push({
@@ -75,14 +126,14 @@ function App() {
     // 4. Calcula quantas parcelas faltam gerar
     // Se tem entrada, a entrada já contou como 1, então geramos (Total - 1)
     const qtdParaGerar = temEntrada ? (totalParcelasDesejadas - 1) : totalParcelasDesejadas;
-    
+
     if (qtdParaGerar > 0) {
       const valorCada = parseFloat((valorParaParcelar / qtdParaGerar).toFixed(2));
       let dataReferencia = new Date(dataPrimeiraParcela);
 
       for (let i = 1; i <= qtdParaGerar; i++) {
         let dVenc = new Date(dataReferencia);
-        
+
         // O número da parcela real (se tem entrada, começa do 2)
         const numReal = temEntrada ? i + 1 : i;
 
@@ -208,23 +259,23 @@ function App() {
     setValorPagoAVista(total > 0 ? total : 0)
   }, [itensVenda, venda.DescontoConcedidoVenda])
 
-    // GERAÇÃO DE CÓDIGO DE VENDA ÚNICO E SEGURO
+  // GERAÇÃO DE CÓDIGO DE VENDA ÚNICO E SEGURO
   useEffect(() => {
     if (venda.DataVenda && venda.CodigoCliente) {
       const dataParts = venda.DataVenda.split('-'); // [2026, 04, 03]
       const ano = dataParts[0].slice(-2); // Pega os últimos 2 dígitos do ano (ex: 26)
       const mes = dataParts[1]; // Mês com 2 dígitos (ex: 04)
       const dia = dataParts[2]; // Dia com 2 dígitos (ex: 03)
-      
+
       const ultimosDigitosCliente = venda.CodigoCliente.slice(-4);
-      
+
       // Criamos um sufixo aleatório de 3 caracteres para garantir unicidade absoluta
       const aleatorio = Math.random().toString(36).substring(2, 5).toUpperCase();
-      
+
       // Novo Padrão: V-ANO-MES-DIA-CLIENTE-ALEATORIO
       // Exemplo: V260403-0085-X7Z
       const novoCodigo = `V${ano}${mes}${dia}-${ultimosDigitosCliente}-${aleatorio}`;
-      
+
       setVenda(prev => ({ ...prev, CodigoVenda: novoCodigo }));
     }
   }, [venda.DataVenda, venda.CodigoCliente]);
@@ -302,7 +353,7 @@ function App() {
     return () => clearTimeout(timeoutId);
   }, [buscaProduto]);
 
-    const handleFinalizarVenda = async () => {
+  const handleFinalizarVenda = async () => {
     try {
       // 1. Cálculos iniciais
       const valorTotalVenda = itensVenda.reduce((acc, item) => acc + (parseFloat(item.TotalVendaVendaDet) || 0), 0);
@@ -323,16 +374,16 @@ function App() {
         ...venda,
         ValorVenda: valorTotalVenda,
         TotalVenda: totalFinal,
-        DescontoConcedidoVenda: parseFloat(venda.DescontoConcedidoVenda ) || 0
+        DescontoConcedidoVenda: parseFloat(venda.DescontoConcedidoVenda) || 0
       });
-      
+
       const codVendaGerado = responseVenda.data.CodigoVenda;
 
       // 3. Gravar os DETALHES da venda (um por um)
       for (const item of itensVenda) {
         await axios.post('http://localhost:3000/DetalhesVenda', {
           ...item,
-          QuantidadeVendaDet: parseInt(item.QuantidadeVendaDet, 10 ),
+          QuantidadeVendaDet: parseInt(item.QuantidadeVendaDet, 10),
           ValorUnitarioVendaDet: parseFloat(item.ValorUnitarioVendaDet),
           TotalVendaVendaDet: parseFloat(item.TotalVendaVendaDet),
           CodigoVendaDet: codVendaGerado,
@@ -345,11 +396,11 @@ function App() {
         CodigoVenda: codVendaGerado,
         CodigoFinanceiro: venda.CodigoCliente,
         listaParcelas: parcelasEditaveis // Enviamos a lista que você editou na tela
-      } );
+      });
 
       // 5. Sucesso e Limpeza
       alert('✅ Venda e Financeiro gravados com sucesso!');
-      
+
       // Limpa os estados para a próxima venda
       setTelaAtiva('home');
       setItensVenda([]);
@@ -357,7 +408,7 @@ function App() {
       setBuscaCliente('');
       setExibirItens(false);
       setDebugData(null); // Limpa o quadro de teste se ainda estiver aberto
-      
+
     } catch (error) {
       console.error("Erro ao finalizar venda:", error);
       alert('❌ Erro ao gravar no banco: ' + (error.response?.data?.error || error.message));
@@ -404,7 +455,13 @@ function App() {
               }}
             />
           )}
-
+          {telaAtiva === 'cliente' && (
+            <TelaCliente
+              cliente={novoCliente}
+              handleChange={(e) => setNovoCliente({ ...novoCliente, [e.target.name]: e.target.value })}
+              handleSubmit={handleSalvarCliente}
+            />
+          )}
           {telaAtiva === 'venda' && <TelaVenda
             venda={venda} setVenda={setVenda} buscaCliente={buscaCliente} setBuscaCliente={setBuscaCliente}
             dataPrimeiraParcela={dataPrimeiraParcela} // ADICIONE ESTA

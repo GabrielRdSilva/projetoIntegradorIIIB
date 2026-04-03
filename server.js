@@ -470,6 +470,34 @@ app.delete('/Parcelas/:id', async (req, res) => {
     }
 })
 
+app.get('/clientes/proximo-codigo', async (req, res) => {
+  try {
+    // Busca todos os clientes para encontrar o maior código
+    const clientes = await prisma.cliente.findMany({
+      select: { codCliente: true }
+    });
+
+    let maiorNumero = 0;
+
+    clientes.forEach(c => {
+      // Extrai os números do formato "CLIEN - 0154"
+      const match = c.codCliente.match(/\d+/);
+      if (match) {
+        const numero = parseInt(match[0], 10);
+        if (numero > maiorNumero) maiorNumero = numero;
+      }
+    });
+
+    // Soma +1 e formata com zeros à esquerda (ex: 0155)
+    const proximoNumero = maiorNumero + 1;
+    const codigoFormatado = `CLIEN - ${proximoNumero.toString().padStart(4, '0')}`;
+
+    res.json({ proximoCodigo: codigoFormatado });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 
 
