@@ -1,18 +1,23 @@
-import React from 'react'
+import React from  "react"
 
-export function Button({ children, variant = 'primary', ...props }) {
+const Button = ({ children, variant = 'primary', ...props }) => {
   const variants = {
-    primary: 'bg-blue-600 hover:bg-blue-700',
-    success: 'bg-green-600 hover:bg-green-700',
-    secondary: 'bg-gray-500 hover:bg-gray-600'
+    primary: 'bg-slate-800 hover:bg-slate-900 text-white',
+    success: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+    secondary: 'bg-slate-200 hover:bg-slate-300 text-slate-700',
+    danger: 'bg-red-500 hover:bg-red-600 text-white'
   }
-
+  
   return (
     <button 
       {...props} 
-      className={`${variants[variant]} text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all active:scale-95`}
+      className={`${variants[variant]} font-semibold py-2.5 px-5 rounded-xl shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2 ${props.className || ''}`}
     >
       {children}
     </button>
   )
 }
+
+// ADICIONE ESTA LINHA NO FINAL:
+export default Button
+

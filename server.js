@@ -133,28 +133,39 @@ app.get('/clientes', async (req, res) => {
 
 // --- METODO GET PARA LISTAR PRODUTOS (Baseado em Clientes) ---
 app.get('/Produtos', async (req, res) => {
-    let produtos = []
-
-    // Verifica se há parâmetros de busca na URL (query strings)
-    if (Object.keys(req.query).length > 0) {
-        produtos = await prisma.produto.findMany({
-            where: {
-                CodigoProd: req.query.CodigoProd,
-                CodigoForn: req.query.CodigoForn,
-                FornecedorNome: req.query.FornecedorNome,
-                TipoProd: req.query.TipoProd,
-                DescricaoProd: req.query.DescricaoProd,
-                MaterialProd: req.query.MaterialProd,
-                ValorCorrigidoProd: req.query.ValorCorrigidoProd // Adicione outros filtros se desejar
-            }
-        })
-    } else {
-        // Se não houver filtros, busca todos
-        produtos = await prisma.produto.findMany()
+    const { CodigoProd } = req.query;
+    
+    try {
+        if (CodigoProd) {
+            const produtos = await prisma.produto.findMany({
+                where: {
+                    OR: [
+                        { 
+                            CodigoProd: { 
+                                contains: CodigoProd, 
+                                mode: 'insensitive' 
+                            } 
+                        },
+                        { 
+                            DescricaoProd: { 
+                                contains: CodigoProd, 
+                                mode: 'insensitive' 
+                            } 
+                        }
+                    ]
+                },
+                take: 10 // Limita a 10 resultados para a lista não ficar gigante
+            });
+            return res.json(produtos);
+        }
+        
+        const todosProdutos = await prisma.produto.findMany({ take: 20 });
+        res.json(todosProdutos);
+    } catch (error) {
+        res.status(500).json({ error: "Erro ao buscar produtos" });
     }
+});
 
-    res.status(200).json(produtos)
-})
 // --- METODO GET PARA LISTAR VENDAS ---
 app.get('/Vendas', async (req, res) => {
     let vendas = []
@@ -367,128 +378,96 @@ app.delete('/DetalhesVenda/:id', async (req, res) => {
 
 // GET todas as parcelas
 app.get('/Parcelas', async (req, res) => {
-  try {
-    const parcelas = await prisma.parcela.findMany()
-    res.json(parcelas)
-  } catch (error) {
-    res.status(500).json({ error: error.message })
-  }
+    try {
+        const parcelas = await prisma.parcela.findMany()
+        res.json(parcelas)
+    } catch (error) {
+        res.status(500).json({ error: error.message })
+    }
 })
 
 // GET parcelas por cliente (CodigoFinanceiro)
 app.get('/Parcelas/cliente/:codigoFinanceiro', async (req, res) => {
-  try {
-    const parcelas = await prisma.parcela.findMany({
-      where: { CodigoFinanceiro: req.params.codigoFinanceiro }
-    })
-    res.json(parcelas)
-  } catch (error) {
-    res.status(500).json({ error: error.message })
-  }
+    try {
+        const parcelas = await prisma.parcela.findMany({
+            where: { CodigoFinanceiro: req.params.codigoFinanceiro }
+        })
+        res.json(parcelas)
+    } catch (error) {
+        res.status(500).json({ error: error.message })
+    }
 })
 
 // GET parcelas por venda
 app.get('/Parcelas/venda/:codigoVenda', async (req, res) => {
-  try {
-    const parcelas = await prisma.parcela.findMany({
-      where: { CodigoVenda: req.params.codigoVenda },
-      orderBy: { NumeroParcela: 'asc' }
-    })
-    res.json(parcelas)
-  } catch (error) {
-    res.status(500).json({ error: error.message })
-  }
+    try {
+        const parcelas = await prisma.parcela.findMany({
+            where: { CodigoVenda: req.params.codigoVenda },
+            orderBy: { NumeroParcela: 'asc' }
+        })
+        res.json(parcelas)
+    } catch (error) {
+        res.status(500).json({ error: error.message })
+    }
 })
 
-// POST criar parcelas (chamado ao finalizar venda)
 app.post('/Parcelas/criar', async (req, res) => {
+  const { CodigoVenda, CodigoFinanceiro, listaParcelas } = req.body;
+
   try {
-    const {
-      CodigoVenda,
+    const dataParaSalvar = listaParcelas.map(p => ({
+      CodigoVenda: CodigoVenda, // Agora não adicionamos o "-1", "-2" aqui se você não quiser
       CodigoFinanceiro,
-      TotalVenda,
-      NumeroParcelas,
-      FormaPagamento,
-      DataPrimeiraVenda
-    } = req.body
+      NumeroParcela: p.NumeroParcela,
+      ValorParcela: parseFloat(p.ValorParcela),
+      ValorRecebido: p.StatusParcela === 'Paga' ? parseFloat(p.ValorParcela) : null,
+      DataVencimento: new Date(p.DataVencimento),
+      DataPagamento: p.StatusParcela === 'Paga' ? new Date(p.DataVencimento) : null,
+      StatusParcela: p.StatusParcela,
+      FormaPagamento: p.FormaPagamento,
+      Observacoes: ""
+    }));
 
-    // Validar dados
-    if (!CodigoVenda || !CodigoFinanceiro || !TotalVenda || !NumeroParcelas || !FormaPagamento) {
-      return res.status(400).json({ error: 'Campos obrigatórios faltando' })
-    }
-
-    // Calcular valor de cada parcela
-    const valorParcela = TotalVenda / NumeroParcelas
-
-    // Calcular valor recebido (com taxa de cartão se aplicável)
-    const isCreditoOuDebito = FormaPagamento === 'Cartao Credito' || FormaPagamento === 'Cartao Debito'
-    const valorRecebido = isCreditoOuDebito ? valorParcela * 0.965 : valorParcela
-
-    // Criar array de parcelas
-    const parcelasArray = []
-    const dataBase = new Date(DataPrimeiraVenda)
-
-    for (let i = 1; i <= NumeroParcelas; i++) {
-      // Calcular data de vencimento (30 dias após a venda para primeira, depois +30 dias para cada)
-      const dataVencimento = new Date(dataBase)
-      dataVencimento.setDate(dataVencimento.getDate() + (30 * i))
-
-      parcelasArray.push({
-        CodigoVenda,
-        CodigoFinanceiro,
-        NumeroParcela: i,
-        ValorParcela: parseFloat(valorParcela.toFixed(2)),
-        ValorRecebido: parseFloat(valorRecebido.toFixed(2)),
-        DataVencimento: dataVencimento,
-        StatusParcela: 'Pendente',
-        FormaPagamento
-      })
-    }
-
-    // Inserir todas as parcelas no banco
-    const parcelasInseridas = await prisma.parcela.createMany({
-      data: parcelasArray
-    })
-
-    res.json({
-      mensagem: `${parcelasInseridas.count} parcelas criadas com sucesso`,
-      parcelas: parcelasArray
-    })
+    await prisma.parcela.createMany({ data: dataParaSalvar });
+    res.json({ message: "Parcelas gravadas!" });
   } catch (error) {
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: error.message });
   }
-})
+});
+
+
+
 
 // PUT atualizar status de parcela
 app.put('/Parcelas/:id', async (req, res) => {
-  try {
-    const { StatusParcela, DataPagamento, Observacoes } = req.body
+    try {
+        const { StatusParcela, DataPagamento, Observacoes } = req.body
 
-    const parcelaAtualizada = await prisma.parcela.update({
-      where: { id: req.params.id },
-      data: {
-        StatusParcela,
-        DataPagamento: DataPagamento ? new Date(DataPagamento) : undefined,
-        Observacoes
-      }
-    })
+        const parcelaAtualizada = await prisma.parcela.update({
+            where: { id: req.params.id },
+            data: {
+                StatusParcela,
+                DataPagamento: DataPagamento ? new Date(DataPagamento) : undefined,
+                Observacoes
+            }
+        })
 
-    res.json(parcelaAtualizada)
-  } catch (error) {
-    res.status(500).json({ error: error.message })
-  }
+        res.json(parcelaAtualizada)
+    } catch (error) {
+        res.status(500).json({ error: error.message })
+    }
 })
 
 // DELETE parcela
 app.delete('/Parcelas/:id', async (req, res) => {
-  try {
-    await prisma.parcela.delete({
-      where: { id: req.params.id }
-    })
-    res.json({ mensagem: 'Parcela deletada com sucesso' })
-  } catch (error) {
-    res.status(500).json({ error: error.message })
-  }
+    try {
+        await prisma.parcela.delete({
+            where: { id: req.params.id }
+        })
+        res.json({ mensagem: 'Parcela deletada com sucesso' })
+    } catch (error) {
+        res.status(500).json({ error: error.message })
+    }
 })
 
 
