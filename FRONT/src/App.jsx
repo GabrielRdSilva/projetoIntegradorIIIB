@@ -52,7 +52,9 @@ function App() {
     DescontoConcedidoVenda: 0,
     TotalVenda: 0
   })
+
   const [itensVenda, setItensVenda] = useState([]) // Lista de produtos adicionados
+  const [exibirItens, setExibirItens] = useState(false) // Controla a visibilidade da seção de itens
   const [buscaProduto, setBuscaProduto] = useState('') // Texto da busca de produto
   const [produtosFiltrados, setProdutosFiltrados] = useState([]) // Sugestões do banco
   const [itemAtual, setItemAtual] = useState({
@@ -65,7 +67,8 @@ function App() {
     MaterialVendaDet: '',
     DescricaoProdutoVendaDet: ''
   })
-
+  const [formaPagamento, setFormaPagamento] = useState('Dinheiro')
+  const [numeroParcelas, setNumeroParcelas] = useState(3)
   // --- LÓGICA DE CÁLCULOS DO PRODUTO ---
   useEffect(() => {
     const valorOriginal = parseFloat(produto.ValorOriginalProd) || 0
@@ -91,6 +94,12 @@ function App() {
       PorcentagemLucroProd: porcLucro.toFixed(2)
     }))
   }, [produto.ValorOriginalProd, produto.DescontoAplicadoProd, produto.EmbalagemProd, produto.PorcentagemAcrescidaProd, produto.ValorCorrigidoProd])
+
+  // Sempre que mudar de tela principal, resetamos a visualização de itens
+  useEffect(() => {
+    setExibirItens(false)
+    setItensVenda([]) // Opcional: limpa o carrinho ao sair da tela
+  }, [telaAtiva])
 
   // --- LÓGICA DE GERAÇÃO DO CÓDIGO DA VENDA ---
   useEffect(() => {
@@ -130,6 +139,7 @@ function App() {
     setBuscaCliente(cliente.Nome)
     setClientesFiltrados([])
   }
+
   // Busca produtos no banco enquanto digita
   useEffect(() => {
     const buscarProdutos = async () => {
@@ -171,6 +181,100 @@ function App() {
     })
     setBuscaProduto('')
   }
+  // Função para finalizar e gravar a venda
+  const handleFinalizarVenda = async () => {
+    // Validações
+    if (!venda.CodigoCliente) {
+      return alert('❌ Selecione um cliente!')
+    }
+    if (itensVenda.length === 0) {
+      return alert('❌ Adicione pelo menos um item à venda!')
+    }
+    if (!venda.TipoVenda) {
+      return alert('❌ Selecione o tipo de venda!')
+    }
+    if (!formaPagamento) {
+      return alert('❌ Selecione a forma de pagamento!')
+    }
+
+    try {
+      // 1. Calcular totais
+      const valorTotalVenda = itensVenda.reduce((acc, item) => acc + parseFloat(item.TotalVendaVendaDet || 0), 0)
+      const totalFinal = valorTotalVenda - venda.DescontoConcedidoVenda
+
+      const vendaCompleta = {
+        ...venda,
+        ValorVenda: valorTotalVenda,
+        TotalVenda: totalFinal
+      }
+
+      // 2. Salvar a venda
+      console.log('Salvando venda:', vendaCompleta)
+      const responseVenda = await axios.post('http://localhost:3000/Vendas', vendaCompleta)
+      const codigoVendaSalvo = responseVenda.data.CodigoVenda
+
+      console.log('Venda salva com código:', codigoVendaSalvo)
+
+      // 3. Salvar os detalhes da venda
+      for (const item of itensVenda) {
+        await axios.post('http://localhost:3000/DetalhesVenda', {
+          CodigoVendaDet: codigoVendaSalvo,
+          DataVendaDet: venda.DataVenda,
+          TipoProdutoVendaDet: item.TipoProdutoVendaDet,
+          MaterialVendaDet: item.MaterialVendaDet,
+          DescricaoProdutoVendaDet: item.DescricaoProdutoVendaDet,
+          CodigoProdVendaDet: item.CodigoProdVendaDet,
+          QuantidadeVendaDet: item.QuantidadeVendaDet,
+          ValorUnitarioVendaDet: item.ValorUnitarioVendaDet,
+          TotalVendaVendaDet: item.TotalVendaVendaDet
+        })
+      }
+
+      console.log('Detalhes da venda salvos')
+
+      // 4. Gerar parcelas se for "A Prazo"
+      if (venda.TipoVenda === 'A Prazo') {
+        console.log('Criando parcelas...')
+        await axios.post('http://localhost:3000/Parcelas/criar', {
+          CodigoVenda: codigoVendaSalvo,
+          CodigoFinanceiro: venda.CodigoCliente,
+          TotalVenda: totalFinal,
+          NumeroParcelas: numeroParcelas,
+          FormaPagamento: formaPagamento,
+          DataPrimeiraVenda: venda.DataVenda
+        })
+        console.log('Parcelas criadas com sucesso')
+      }
+
+      // 5. Sucesso!
+      alert('✅ Venda finalizada com sucesso!')
+
+      // Limpar formulário
+      setVenda({
+        DataVenda: new Date().toISOString().split('T')[0],
+        CodigoVenda: '',
+        VendedorVenda: 'Gabriel Rodrigues',
+        TipoVenda: 'Avista',
+        CodigoCliente: '',
+        ReferenciaCliente: '',
+        NomeCliente: '',
+        ValorVenda: 0,
+        DescontoConcedidoVenda: 0,
+        TotalVenda: 0
+      })
+      setItensVenda([])
+      setExibirItens(false)
+      setBuscaCliente('')
+      setFormaPagamento('Dinheiro')
+      setNumeroParcelas(3)
+      setTelaAtiva('home')
+
+    } catch (error) {
+      console.error('Erro completo:', error)
+      alert('❌ Erro ao finalizar venda: ' + (error.response?.data?.error || error.message))
+    }
+  }
+
 
   const handleChangeProduto = (e) => {
     const { name, value } = e.target
@@ -285,6 +389,7 @@ function App() {
                     <option value="A Prazo">A Prazo</option>
                   </select>
                 </div>
+
                 <Input label="Cód. Venda (Automático)" name="CodigoVenda" value={venda.CodigoVenda} readOnly />
 
                 <div className="md:col-span-2 relative">
@@ -311,81 +416,210 @@ function App() {
                   <div className="flex flex-col"><span className="text-xs text-slate-400 font-bold uppercase">Nome Selecionado</span><span className="font-semibold">{venda.NomeCliente || 'Nenhum cliente selecionado'}</span></div>
                 </div>
 
-                <div className="col-span-full mt-6">
-                  <Button variant="primary" className="w-full py-4 text-lg">Próximo Passo: Adicionar Itens</Button>
-                </div>
-                {/* SEÇÃO DE ADIÇÃO DE PRODUTOS */}
-                <div className="col-span-full mt-8 border-t pt-8">
-                  <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <span className="bg-emerald-100 text-emerald-600 w-6 h-6 rounded-full flex items-center justify-center text-xs">2</span>
-                    Itens da Venda
-                  </h3>
-
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                    <div className="md:col-span-1 relative">
-                      <Input
-                        label="Buscar Produto (Cód)"
-                        placeholder="Ex: NAS-001"
-                        value={buscaProduto}
-                        onChange={(e) => setBuscaProduto(e.target.value)}
-                      />
-                      {produtosFiltrados.length > 0 && (
-                        <ul className="absolute z-20 w-full bg-white border border-slate-200 rounded-xl shadow-lg mt-1 max-h-40 overflow-y-auto">
-                          {produtosFiltrados.map((p) => (
-                            <li key={p.id} onClick={() => selecionarProduto(p)} className="p-3 hover:bg-emerald-50 cursor-pointer text-sm border-b last:border-none border-slate-100">
-                              <span className="font-bold">{p.CodigoProd}</span> - {p.DescricaoProd}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-
-                    <Input
-                      label="Qtd" type="number"
-                      value={itemAtual.QuantidadeVendaDet}
-                      onChange={(e) => setItemAtual({ ...itemAtual, QuantidadeVendaDet: e.target.value, TotalVendaVendaDet: (e.target.value * itemAtual.ValorUnitarioVendaDet).toFixed(2) })}
-                    />
-
-                    <Input
-                      label="Valor Unit. (R$)" type="number"
-                      value={itemAtual.ValorUnitarioVendaDet}
-                      onChange={(e) => setItemAtual({ ...itemAtual, ValorUnitarioVendaDet: e.target.value, TotalVendaVendaDet: (e.target.value * itemAtual.QuantidadeVendaDet).toFixed(2) })}
-                    />
-
-                    <Button variant="success" type="button" onClick={adicionarItem}>+ Adicionar Item</Button>
+                {/* Botão para exibir a seção de itens */}
+                {!exibirItens && (
+                  <div className="col-span-full mt-6">
+                    <Button
+                      variant="primary"
+                      type="button"
+                      onClick={() => setExibirItens(true)}
+                      className="w-full py-4 text-lg"
+                    >
+                      Adicionar Itens
+                    </Button>
                   </div>
+                )}
 
-                  {/* TABELA DE ITENS ADICIONADOS */}
-                  {itensVenda.length > 0 && (
-                    <div className="mt-6 overflow-hidden border border-slate-200 rounded-2xl">
-                      <table className="w-full text-left border-collapse">
-                        <thead className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-                          <tr>
-                            <th className="p-4">Produto</th>
-                            <th className="p-4">Qtd</th>
-                            <th className="p-4">Unitário</th>
-                            <th className="p-4">Total</th>
-                            <th className="p-4">Ação</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {itensVenda.map((item) => (
-                            <tr key={item.idTemporario} className="text-sm text-slate-700 hover:bg-slate-50">
-                              <td className="p-4 font-bold">{item.CodigoProdVendaDet} <span className="block font-normal text-xs text-slate-400">{item.DescricaoProdutoVendaDet}</span></td>
-                              <td className="p-4">{item.QuantidadeVendaDet}</td>
-                              <td className="p-4">R$ {item.ValorUnitarioVendaDet}</td>
-                              <td className="p-4 font-bold">R$ {item.TotalVendaVendaDet}</td>
-                              <td className="p-4">
-                                <button onClick={() => setItensVenda(itensVenda.filter(i => i.idTemporario !== item.idTemporario))} className="text-red-500 hover:text-red-700 font-bold">Remover</button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                {/* SEÇÃO DE ADIÇÃO DE PRODUTOS - SÓ APARECE SE exibirItens FOR TRUE */}
+                {exibirItens && (
+                  <div className="col-span-full mt-8 border-t pt-8 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                      <span className="bg-emerald-100 text-emerald-600 w-6 h-6 rounded-full flex items-center justify-center text-xs">2</span>
+                      Itens da Venda
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                      <div className="md:col-span-1 relative">
+                        <Input
+                          label="Buscar Produto (Cód)"
+                          placeholder="Ex: NAS-001"
+                          value={buscaProduto}
+                          onChange={(e) => setBuscaProduto(e.target.value)}
+                        />
+                        {produtosFiltrados.length > 0 && (
+                          <ul className="absolute z-20 w-full bg-white border border-slate-200 rounded-xl shadow-lg mt-1 max-h-40 overflow-y-auto">
+                            {produtosFiltrados.map((p) => (
+                              <li key={p.id} onClick={() => selecionarProduto(p)} className="p-3 hover:bg-emerald-50 cursor-pointer text-sm border-b last:border-none border-slate-100">
+                                <span className="font-bold">{p.CodigoProd}</span> - {p.TipoProd} - {p.DescricaoProd}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+
+                      <Input
+                        label="Qtd" type="number"
+                        value={itemAtual.QuantidadeVendaDet}
+                        onChange={(e) => setItemAtual({ ...itemAtual, QuantidadeVendaDet: e.target.value, TotalVendaVendaDet: (e.target.value * itemAtual.ValorUnitarioVendaDet).toFixed(2) })}
+                      />
+
+                      <Input
+                        label="Valor Unit. (R$)" type="number"
+                        value={itemAtual.ValorUnitarioVendaDet}
+                        onChange={(e) => setItemAtual({ ...itemAtual, ValorUnitarioVendaDet: e.target.value, TotalVendaVendaDet: (e.target.value * itemAtual.QuantidadeVendaDet).toFixed(2) })}
+                      />
+
+                      <Button variant="success" type="button" onClick={adicionarItem}>+ Adicionar Item</Button>
                     </div>
-                  )}
-                </div>
 
+                    {/* TABELA DE ITENS ADICIONADOS */}
+                    {itensVenda.length > 0 && (
+                      <div className="mt-6 overflow-hidden border border-slate-200 rounded-2xl">
+                        <table className="w-full text-left border-collapse">
+                          <thead className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                            <tr>
+                              <th className="p-4">Produto</th>
+                              <th className="p-4">Qtd</th>
+                              <th className="p-4">Unitário</th>
+                              <th className="p-4">Total</th>
+                              <th className="p-4">Ação</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {itensVenda.map((item) => (
+                              <tr key={item.idTemporario} className="text-sm text-slate-700 hover:bg-slate-50">
+                                <td className="p-4 font-bold">
+                                  {item.CodigoProdVendaDet}
+                                  <span className="block font-normal text-xs text-slate-400">
+                                    {item.TipoProdutoVendaDet} - {item.DescricaoProdutoVendaDet}
+                                  </span>
+                                </td>
+                                <td className="p-4">{item.QuantidadeVendaDet}</td>
+                                <td className="p-4">R$ {item.ValorUnitarioVendaDet}</td>
+                                <td className="p-4 font-bold">R$ {item.TotalVendaVendaDet}</td>
+                                <td className="p-4">
+                                  <button onClick={() => setItensVenda(itensVenda.filter(i => i.idTemporario !== item.idTemporario))} className="text-red-500 hover:text-red-700 font-bold">Remover</button>
+                                </td>
+                              </tr>
+
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {/* RESUMO DA VENDA - TOTALIZAÇÕES */}
+                    <div className="mt-10 pt-6 border-t border-slate-100">
+                      <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                        <span className="bg-emerald-100 text-emerald-600 w-6 h-6 rounded-full flex items-center justify-center text-xs">3</span>
+                        Resumo da Venda
+                      </h3>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-emerald-50/50 p-6 rounded-2xl border border-emerald-100 mb-6">
+                        {/* Valor Total da Venda */}
+                        <div className="flex flex-col">
+                          <span className="text-xs text-emerald-600 font-bold uppercase tracking-widest">Valor Total Venda</span>
+                          <span className="text-3xl font-bold text-emerald-700 mt-2">
+                            R$ {itensVenda.reduce((acc, item) => acc + parseFloat(item.TotalVendaVendaDet || 0), 0).toFixed(2)}
+                          </span>
+                        </div>
+
+                        {/* Desconto Opcional */}
+                        <div className="flex flex-col gap-2">
+                          <label className="text-xs text-slate-600 font-bold uppercase tracking-widest">Desconto Opcional (R$)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={venda.DescontoConcedidoVenda}
+                            onChange={(e) => setVenda({ ...venda, DescontoConcedidoVenda: parseFloat(e.target.value) || 0 })}
+                            className="border border-slate-200 p-3 rounded-xl bg-white outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-lg"
+                            placeholder="0.00"
+                          />
+                        </div>
+
+                        {/* Total Final */}
+                        <div className="flex flex-col">
+                          <span className="text-xs text-orange-600 font-bold uppercase tracking-widest">Total Final</span>
+                          <span className="text-3xl font-bold text-orange-700 mt-2">
+                            R$ {(itensVenda.reduce((acc, item) => acc + parseFloat(item.TotalVendaVendaDet || 0), 0) - venda.DescontoConcedidoVenda).toFixed(2)}
+                          </span>
+                        </div>
+                        {/* RESUMO DA VENDA - TOTALIZAÇÕES */}
+                        <div className="mt-10 pt-6 border-t border-slate-100"></div>
+                        {/* SEÇÃO DE TIPO DE VENDA E PAGAMENTO */}
+                        <div className="mt-8 pt-6 border-t border-slate-100">
+                          <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <span className="bg-blue-100 text-blue-600 w-6 h-6 rounded-full flex items-center justify-center text-xs">3</span>
+                            Tipo de Venda e Pagamento
+                          </h3>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-blue-50/50 p-6 rounded-2xl border border-blue-100 mb-6">
+                            {/* Tipo de Venda */}
+                            <div className="flex flex-col gap-2">
+                              <label className="text-sm font-bold text-slate-700">Tipo de Venda</label>
+                              <select
+                                value={venda.TipoVenda}
+                                onChange={(e) => setVenda({ ...venda, TipoVenda: e.target.value })}
+                                className="border border-slate-200 p-3 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-500 font-semibold text-lg"
+                              >
+                                <option value="Avista">À Vista</option>
+                                <option value="A Prazo">A Prazo</option>
+                              </select>
+                            </div>
+
+                            {/* Forma de Pagamento */}
+                            <div className="flex flex-col gap-2">
+                              <label className="text-sm font-bold text-slate-700">Forma de Pagamento</label>
+                              <select
+                                value={formaPagamento}
+                                onChange={(e) => setFormaPagamento(e.target.value)}
+                                className="border border-slate-200 p-3 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-500 font-semibold text-lg"
+                              >
+                                <option value="Dinheiro">Dinheiro</option>
+                                <option value="Cartao Credito">Cartão de Crédito</option>
+                                <option value="Cartao Debito">Cartão de Débito</option>
+                                <option value="Transferencia">Transferência Bancária</option>
+                                <option value="Cheque">Cheque</option>
+                                <option value="Pix">PIX</option>
+                              </select>
+                            </div>
+
+                            {/* Campo de Parcelas - Só aparece se for "A Prazo" */}
+                            {venda.TipoVenda === 'A Prazo' && (
+                              <div className="flex flex-col gap-2">
+                                <label className="text-sm font-bold text-slate-700">Número de Parcelas</label>
+                                <input
+                                  type="number"
+                                  min="2"
+                                  max="12"
+                                  value={numeroParcelas}
+                                  onChange={(e) => setNumeroParcelas(parseInt(e.target.value) || 3)}
+                                  className="border border-slate-200 p-3 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-500 font-semibold text-lg"
+                                  placeholder="Ex: 3"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+
+                      </div>
+
+                      {/* Botão Finalizar */}
+                      <Button
+                        variant="success"
+                        type="button"
+                        onClick={handleFinalizarVenda}
+                        className="w-full py-4 text-xl"
+                      >
+                        Finalizar e Gravar Venda
+                      </Button>
+
+
+                    </div>
+
+                  </div>
+                )}
               </form>
             </div>
           )}
@@ -396,6 +630,7 @@ function App() {
 }
 
 export default App
+
 
 
 
