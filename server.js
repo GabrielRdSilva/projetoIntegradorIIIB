@@ -1,4 +1,4 @@
-/* SENHA Q4QUPfGBJn8gJvtm */
+/* SENHA Q4QUPfGBJn8gJvtm  - dtOKlASA71lXFWv1*/
 import express from 'express'
 import cors from 'cors'
 import { PrismaClient } from '@prisma/client'
@@ -12,7 +12,7 @@ app.use(cors())
 app.post('/clientes', async (req, res) => {
     const cliente = await prisma.cliente.create({
         data: {
-            codCliente: req.body.codCliente,
+            codCliente: req.body.codCliente, // Certifique-se de que o campo codCliente seja único no banco de dados
             Nome: req.body.Nome,
             Email: req.body.Email,
             Referencia: req.body.Referencia,
@@ -103,26 +103,34 @@ app.post('/DetalhesVenda', async (req, res) => {
 
 // --- METODO GET PARA LISTAR clientes ---
 const clientes = []
+// --- No seu arquivo server.js ---
 app.get('/clientes', async (req, res) => {
-    /*console.log(req)*/
-
     let clientes = []
-    if (req.query) {
+
+    if (req.query.Nome) { // Se houver busca por nome
         clientes = await prisma.cliente.findMany({
             where: {
-                Nome: req.query.Nome,
+                Nome: {
+                    contains: req.query.Nome, // Busca por parte do nome
+                    mode: 'insensitive'      // Ignora maiúsculas/minúsculas
+                }
+            }
+        })
+    } else if (Object.keys(req.query).length > 0) {
+        // Outros filtros que você já tenha (ex: codCliente)
+        clientes = await prisma.cliente.findMany({
+            where: {
                 codCliente: req.query.codCliente,
-                Referencia: req.query.Referencia,
-                Email: req.query.Email,
-                Endereco: req.query.Endereco,
-                Contato: req.query.Contato
+                Email: req.query.Email
             }
         })
     } else {
-        const clientes = await prisma.cliente.findMany()
+        clientes = await prisma.cliente.findMany()
     }
+
     res.status(200).json(clientes)
 })
+
 // --- METODO GET PARA LISTAR PRODUTOS (Baseado em Clientes) ---
 app.get('/Produtos', async (req, res) => {
     let produtos = []
@@ -170,7 +178,7 @@ app.get('/Vendas', async (req, res) => {
 // --- METODO GET PARA LISTAR DETALHES (Permite filtrar por Código da Venda) ---
 app.get('/DetalhesVenda', async (req, res) => {
     let detalhes = []
-    
+
     // Filtro principal: buscar todos os itens de uma venda específica
     if (req.query.CodigoVendaDet) {
         detalhes = await prisma.detalheVenda.findMany({
@@ -308,7 +316,7 @@ app.delete('/Produtos/:id', async (req, res) => {
 // --- METODO DELETE PARA EXCLUIR UMA VENDA (Com Trava de Segurança) ---
 app.delete('/Vendas/:id', async (req, res) => {
     const { id } = req.params
-    
+
     try {
         // 1. Primeiro, buscamos a venda para saber qual é o seu CodigoVenda
         const venda = await prisma.venda.findUnique({
@@ -326,8 +334,8 @@ app.delete('/Vendas/:id', async (req, res) => {
 
         // 3. Se houver detalhes, impedimos a exclusão
         if (temDetalhes) {
-            return res.status(403).json({ 
-                error: "Não é possível excluir esta venda pois existem itens vinculados a ela nos Detalhes de Venda. Exclua os itens primeiro." 
+            return res.status(403).json({
+                error: "Não é possível excluir esta venda pois existem itens vinculados a ela nos Detalhes de Venda. Exclua os itens primeiro."
             })
         }
 
@@ -354,6 +362,133 @@ app.delete('/DetalhesVenda/:id', async (req, res) => {
     } catch (error) {
         res.status(400).json({ error: "Erro ao excluir detalhe. Verifique se o ID existe." })
     }
+})
+// ==================== PARCELAS ====================
+
+// GET todas as parcelas
+app.get('/Parcelas', async (req, res) => {
+  try {
+    const parcelas = await prisma.parcela.findMany()
+    res.json(parcelas)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// GET parcelas por cliente (CodigoFinanceiro)
+app.get('/Parcelas/cliente/:codigoFinanceiro', async (req, res) => {
+  try {
+    const parcelas = await prisma.parcela.findMany({
+      where: { CodigoFinanceiro: req.params.codigoFinanceiro }
+    })
+    res.json(parcelas)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// GET parcelas por venda
+app.get('/Parcelas/venda/:codigoVenda', async (req, res) => {
+  try {
+    const parcelas = await prisma.parcela.findMany({
+      where: { CodigoVenda: req.params.codigoVenda },
+      orderBy: { NumeroParcela: 'asc' }
+    })
+    res.json(parcelas)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// POST criar parcelas (chamado ao finalizar venda)
+app.post('/Parcelas/criar', async (req, res) => {
+  try {
+    const {
+      CodigoVenda,
+      CodigoFinanceiro,
+      TotalVenda,
+      NumeroParcelas,
+      FormaPagamento,
+      DataPrimeiraVenda
+    } = req.body
+
+    // Validar dados
+    if (!CodigoVenda || !CodigoFinanceiro || !TotalVenda || !NumeroParcelas || !FormaPagamento) {
+      return res.status(400).json({ error: 'Campos obrigatórios faltando' })
+    }
+
+    // Calcular valor de cada parcela
+    const valorParcela = TotalVenda / NumeroParcelas
+
+    // Calcular valor recebido (com taxa de cartão se aplicável)
+    const isCreditoOuDebito = FormaPagamento === 'Cartao Credito' || FormaPagamento === 'Cartao Debito'
+    const valorRecebido = isCreditoOuDebito ? valorParcela * 0.965 : valorParcela
+
+    // Criar array de parcelas
+    const parcelasArray = []
+    const dataBase = new Date(DataPrimeiraVenda)
+
+    for (let i = 1; i <= NumeroParcelas; i++) {
+      // Calcular data de vencimento (30 dias após a venda para primeira, depois +30 dias para cada)
+      const dataVencimento = new Date(dataBase)
+      dataVencimento.setDate(dataVencimento.getDate() + (30 * i))
+
+      parcelasArray.push({
+        CodigoVenda,
+        CodigoFinanceiro,
+        NumeroParcela: i,
+        ValorParcela: parseFloat(valorParcela.toFixed(2)),
+        ValorRecebido: parseFloat(valorRecebido.toFixed(2)),
+        DataVencimento: dataVencimento,
+        StatusParcela: 'Pendente',
+        FormaPagamento
+      })
+    }
+
+    // Inserir todas as parcelas no banco
+    const parcelasInseridas = await prisma.parcela.createMany({
+      data: parcelasArray
+    })
+
+    res.json({
+      mensagem: `${parcelasInseridas.count} parcelas criadas com sucesso`,
+      parcelas: parcelasArray
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// PUT atualizar status de parcela
+app.put('/Parcelas/:id', async (req, res) => {
+  try {
+    const { StatusParcela, DataPagamento, Observacoes } = req.body
+
+    const parcelaAtualizada = await prisma.parcela.update({
+      where: { id: req.params.id },
+      data: {
+        StatusParcela,
+        DataPagamento: DataPagamento ? new Date(DataPagamento) : undefined,
+        Observacoes
+      }
+    })
+
+    res.json(parcelaAtualizada)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// DELETE parcela
+app.delete('/Parcelas/:id', async (req, res) => {
+  try {
+    await prisma.parcela.delete({
+      where: { id: req.params.id }
+    })
+    res.json({ mensagem: 'Parcela deletada com sucesso' })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
 })
 
 
