@@ -154,12 +154,12 @@ app.get('/Produtos', async (req, res) => {
                         }
                     ]
                 },
-                take: 10 // Limita a 10 resultados para a lista não ficar gigante
+                take: 100 // Limita a 100 resultados para a lista não ficar gigante
             });
             return res.json(produtos);
         }
         
-        const todosProdutos = await prisma.produto.findMany({ take: 20 });
+        const todosProdutos = await prisma.produto.findMany({ take: 200 }); // Limita a 200 produtos para evitar sobrecarga
         res.json(todosProdutos);
     } catch (error) {
         res.status(500).json({ error: "Erro ao buscar produtos" });
@@ -247,10 +247,10 @@ app.put('/clientes/:id', async (req, res) => {
 })
 // --- METODO PUT PARA ALTERAR UM PRODUTO ---
 app.put('/Produtos/:id', async (req, res) => {
-    const { id } = req.params
+    const { id } = req.params;   // id é string (ex: "69c80180aa824503c0dbccf8")
     try {
         const produtoAtualizado = await prisma.produto.update({
-            where: { id: id },
+            where: { id: id },   // sem parseInt
             data: {
                 CodigoProd: req.body.CodigoProd,
                 CodigoForn: req.body.CodigoForn,
@@ -272,12 +272,13 @@ app.put('/Produtos/:id', async (req, res) => {
                 PorcentagemLucroProd: Number(req.body.PorcentagemLucroProd),
                 LucroProd: Number(req.body.LucroProd)
             }
-        })
-        res.status(200).json(produtoAtualizado)
+        });
+        res.status(200).json(produtoAtualizado);
     } catch (error) {
-        res.status(400).json({ error: "Erro ao atualizar produto. Verifique se o ID está correto." })
+        console.error(error);
+        res.status(400).json({ error: "Erro ao atualizar produto. Verifique se o ID está correto." });
     }
-})
+});
 // --- METODO PUT PARA ALTERAR UM DETALHE ---
 app.put('/DetalhesVenda/:id', async (req, res) => {
     const { id } = req.params
@@ -305,12 +306,14 @@ app.put('/DetalhesVenda/:id', async (req, res) => {
 
 // --- METODO DELETE PARA EXCLUIR UM cliente---
 app.delete('/clientes/:id', async (req, res) => {
-    const { id } = req.params
-    await prisma.cliente.delete({
-        where: { id: id },
-    })
-    res.status(200).json({ message: 'Cliente deletado...' })
-})
+    try {
+        await prisma.cliente.delete({ where: { id: req.params.id } });
+        res.json({ message: "Excluído!" });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // --- METODO DELETE PARA EXCLUIR UM PRODUTO ---
 app.delete('/Produtos/:id', async (req, res) => {
     const { id } = req.params
