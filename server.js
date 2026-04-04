@@ -172,20 +172,43 @@ app.get('/Vendas', async (req, res) => {
 
     // Verifica se há parâmetros de busca (ex: por Vendedor ou Código de Venda)
     if (Object.keys(req.query).length > 0) {
+        const whereClause = {};
+
+        if (req.query.nome) {
+            whereClause.NomeCliente = {
+                contains: req.query.nome,
+                mode: 'insensitive'
+            };
+        }
+        if (req.query.codCliente) {
+            whereClause.CodigoCliente = {
+                contains: req.query.codCliente,
+                mode: 'insensitive'
+            };
+        }
+        if (req.query.data) {
+            // Para filtrar por data exata, assumindo que a data vem no formato YYYY-MM-DD
+            // e que o campo DataVenda no banco é um DateTime
+            const dataInicio = new Date(req.query.data);
+            const dataFim = new Date(req.query.data);
+            dataFim.setDate(dataFim.getDate() + 1); // Adiciona um dia para pegar o dia inteiro
+
+            whereClause.DataVenda = {
+                gte: dataInicio.toISOString(),
+                lt: dataFim.toISOString()
+            };
+        }
+
         vendas = await prisma.venda.findMany({
-            where: {
-                CodigoCliente: req.query.CodigoCliente,
-                NomeCliente: req.query.NomeCliente,
-                CodigoVenda: req.query.CodigoVenda,
-                VendedorVenda: req.query.VendedorVenda,
-                TipoVenda: req.query.TipoVenda
-            }
-        })
+            where: whereClause
+        });
     } else {
-        vendas = await prisma.venda.findMany()
+        vendas = await prisma.venda.findMany();
     }
     res.status(200).json(vendas)
 })
+
+
 // --- METODO GET PARA LISTAR DETALHES (Permite filtrar por Código da Venda) ---
 app.get('/DetalhesVenda', async (req, res) => {
     let detalhes = []
