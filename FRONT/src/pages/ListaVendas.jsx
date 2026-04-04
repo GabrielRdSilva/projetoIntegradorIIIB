@@ -1,7 +1,8 @@
 import React from "react";
 import { format } from "date-fns";
 
-const ListaVendas = ({ vendas, aoNovaVenda, aoDetalhar, filtros, setFiltros, aoBuscar }) => {
+const ListaVendas = ({ vendas, aoNovaVenda, aoDetalhar, aoEditarVenda, filtros, setFiltros, aoBuscar }) => {
+
     const handleFiltroChange = (e) => {
         const { name, value } = e.target;
         setFiltros(prev => ({ ...prev, [name]: value }));
@@ -73,6 +74,8 @@ const ListaVendas = ({ vendas, aoNovaVenda, aoDetalhar, filtros, setFiltros, aoB
                             <th className="p-4">Data</th>
                             <th className="p-4">Total</th>
                             <th className="p-4">Ações</th>
+                            <th className="p-4"></th>
+
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -91,6 +94,10 @@ const ListaVendas = ({ vendas, aoNovaVenda, aoDetalhar, filtros, setFiltros, aoB
                                 <td className="p-4">
                                     <button onClick={() => aoDetalhar(v)} className="text-blue-600 font-bold">Detalhes</button>
                                 </td>
+                                <td className="p-4">
+                                    <button onClick={() => aoEditarVenda(v.id)} className="text-orange-600 font-bold">Editar</button>
+                                </td>
+
                             </tr>
                         ))}
                     </tbody>

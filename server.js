@@ -227,30 +227,95 @@ app.get('/DetalhesVenda', async (req, res) => {
 })
 
 
-// --- METODO PUT PARA ALTERAR UMA VENDA ---
-app.put('/Vendas/:id', async (req, res) => {
-    const { id } = req.params
+app.put("/Vendas/:id", async (req, res) => {
+    const { id } = req.params;
+    const { vendaData, itensVenda, parcelasData } = req.body;
+
+    console.log("--- INICIANDO ATUALIZAÇÃO DE VENDA ---");
+    console.log("ID da Venda:", id);
+
     try {
-        const vendaAtualizada = await prisma.venda.update({
-            where: { id: id },
-            data: {
-                DataVenda: req.body.DataVenda ? new Date(req.body.DataVenda) : undefined,
-                CodigoVenda: req.body.CodigoVenda,
-                VendedorVenda: req.body.VendedorVenda,
-                TipoVenda: req.body.TipoVenda,
-                CodigoCliente: req.body.CodigoCliente,
-                ReferenciaCliente: req.body.ReferenciaCliente,
-                NomeCliente: req.body.NomeCliente,
-                ValorVenda: Number(req.body.ValorVenda),
-                DescontoConcedidoVenda: Number(req.body.DescontoConcedidoVenda),
-                TotalVenda: Number(req.body.TotalVenda)
+        const resultado = await prisma.$transaction(async (tx) => {
+            // 1. Atualizar os dados principais da Venda
+            const vendaAtualizada = await tx.venda.update({
+                where: { id: id },
+                data: {
+                    DataVenda: vendaData.DataVenda ? new Date(vendaData.DataVenda) : undefined,
+                    VendedorVenda: vendaData.VendedorVenda,
+                    TipoVenda: vendaData.TipoVenda,
+                    CodigoCliente: vendaData.CodigoCliente,
+                    ReferenciaCliente: vendaData.ReferenciaCliente,
+                    NomeCliente: vendaData.NomeCliente,
+                    ValorVenda: Number(vendaData.ValorVenda),
+                    DescontoConcedidoVenda: Number(vendaData.DescontoConcedidoVenda || 0),
+                    TotalVenda: Number(vendaData.TotalVenda)
+                }
+            });
+
+            console.log("Venda principal atualizada:", vendaAtualizada.CodigoVenda);
+
+            // 2. Substituir Detalhes (Deleta e Recria)
+            await tx.detalheVenda.deleteMany({
+                where: { CodigoVendaDet: vendaAtualizada.CodigoVenda }
+            });
+
+            if (itensVenda && itensVenda.length > 0) {
+                const detalhesParaCriar = itensVenda.map(item => ({
+                    CodigoVendaDet: vendaAtualizada.CodigoVenda,
+                    DataVendaDet: new Date(vendaData.DataVenda), // Usa a data da venda
+                    CodigoProdVendaDet: item.CodigoProdVendaDet,
+                    TipoProdutoVendaDet: item.TipoProdutoVendaDet,
+                    MaterialVendaDet: item.MaterialVendaDet,
+                    DescricaoProdutoVendaDet: item.DescricaoProdutoVendaDet,
+                    QuantidadeVendaDet: Number(item.QuantidadeVendaDet),
+                    ValorUnitarioVendaDet: Number(item.ValorUnitarioVendaDet),
+                    TotalVendaVendaDet: Number(item.TotalVendaVendaDet)
+                }));
+                await tx.detalheVenda.createMany({ data: detalhesParaCriar });
+                console.log("Itens da venda atualizados.");
             }
-        })
-        res.status(200).json(vendaAtualizada)
+
+            // 3. Substituir Parcelas PENDENTES
+            await tx.parcela.deleteMany({
+                where: {
+                    CodigoVenda: vendaAtualizada.CodigoVenda,
+                    StatusParcela: "Pendente"
+                }
+            });
+
+            if (parcelasData && parcelasData.length > 0) {
+                const parcelasParaCriar = parcelasData.map(p => ({
+                    CodigoVenda: vendaAtualizada.CodigoVenda,
+                    CodigoFinanceiro: p.CodigoFinanceiro || vendaData.CodigoCliente,
+                    NumeroParcela: Number(p.NumeroParcela),
+                    ValorParcela: parseFloat(p.ValorParcela),
+                    ValorRecebido: p.ValorRecebido ? parseFloat(p.ValorRecebido) : null,
+                    DataVencimento: new Date(p.DataVencimento),
+                    DataPagamento: p.DataPagamento ? new Date(p.DataPagamento) : null,
+                    StatusParcela: p.StatusParcela,
+                    FormaPagamento: p.FormaPagamento,
+                    Observacoes: p.Observacoes || ""
+                }));
+                await tx.parcela.createMany({ data: parcelasParaCriar });
+                console.log("Parcelas atualizadas.");
+            }
+
+            return { success: true };
+        });
+
+        res.status(200).json({ message: "Venda atualizada com sucesso!" });
+
     } catch (error) {
-        res.status(400).json({ error: "Erro ao atualizar venda. Verifique o ID fornecido." })
+        console.error("ERRO NA TRANSAÇÃO PRISMA:", error);
+        res.status(400).json({ 
+            error: "Erro ao atualizar venda.", 
+            details: error.message 
+        });
     }
-})
+});
+
+
+
 
 // --- METODO PUT PARA ALTERAR UM cliente ---
 app.put('/clientes/:id', async (req, res) => {
@@ -526,6 +591,87 @@ app.get('/clientes/proximo-codigo', async (req, res) => {
 
 
 
+// --- COPIE E COLE ESTE BLOCO NO FINAL DO SEU server.js (ANTES DO app.listen) ---
+
+app.get("/Vendas/:id", async (req, res) => {
+    const { id } = req.params;
+    try {
+        // Busca a venda pelo ID interno do MongoDB (_id)
+        const venda = await prisma.venda.findUnique({
+            where: { id: id }
+        });
+
+        if (!venda) {
+            return res.status(404).json({ error: "Venda não encontrada no banco." });
+        }
+
+        // Busca os itens vinculados a esta venda pelo CodigoVenda
+        const detalhesVenda = await prisma.detalheVenda.findMany({
+            where: { CodigoVendaDet: venda.CodigoVenda }
+        });
+
+        // Busca as parcelas vinculadas a esta venda pelo CodigoVenda
+        const parcelas = await prisma.parcela.findMany({
+            where: { CodigoVenda: venda.CodigoVenda },
+            orderBy: { NumeroParcela: "asc" }
+        });
+
+        // Retorna tudo agrupado para o frontend
+        res.status(200).json({ ...venda, itensVenda: detalhesVenda, parcelas: parcelas });
+
+    } catch (error) {
+        console.error("Erro interno no servidor:", error);
+        res.status(500).json({ error: "Erro ao buscar detalhes da venda." });
+    }
+});
+
+// --- FIM DO BLOCO ---
+// --- ROTA PARA RESUMO DE COBRANÇA POR CLIENTE ---
+app.get("/Cobranca/cliente/:codCliente", async (req, res) => {
+    const { codCliente } = req.params;
+    try {
+        // 1. Busca todas as vendas do cliente
+        const vendas = await prisma.venda.findMany({
+            where: { CodigoCliente: codCliente },
+            orderBy: { DataVenda: 'desc' }
+        });
+
+        const resumoCobranca = [];
+
+        // 2. Para cada venda, calcula o financeiro
+        for (const venda of vendas) {
+            const parcelas = await prisma.parcela.findMany({
+                where: { CodigoVenda: venda.CodigoVenda }
+            });
+
+            const totalPago = parcelas
+                .filter(p => p.StatusParcela === "Paga")
+                .reduce((acc, p) => acc + (p.ValorParcela || 0), 0);
+
+            const totalPendente = parcelas
+                .filter(p => p.StatusParcela === "Pendente")
+                .reduce((acc, p) => acc + (p.ValorParcela || 0), 0);
+
+            // 3. Só adiciona ao resumo se houver valor pendente
+            if (totalPendente > 0) {
+                resumoCobranca.push({
+                    id: venda.id,
+                    CodigoVenda: venda.CodigoVenda,
+                    DataVenda: venda.DataVenda,
+                    TotalVenda: venda.TotalVenda,
+                    ValorPago: totalPago,
+                    ValorPendente: totalPendente,
+                    PercentualPago: ((totalPago / venda.TotalVenda) * 100).toFixed(1)
+                });
+            }
+        }
+
+        res.status(200).json(resumoCobranca);
+    } catch (error) {
+        console.error("Erro na cobrança:", error);
+        res.status(500).json({ error: "Erro ao buscar dados de cobrança." });
+    }
+});
 
 
 app.get('/', (req, res) => {

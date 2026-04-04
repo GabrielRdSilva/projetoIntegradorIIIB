@@ -1,12 +1,13 @@
-import React from  "react"
+import React from "react";
 
-const Sidebar = ({ setTelaAtiva }) => {
+const Sidebar = ({ setTelaAtiva, telaAtiva }) => { // Adicionei telaAtiva aqui
   const menuItems = [
     { id: 'home', label: 'Dashboard', icon: '📊' },
     { id: 'produto', label: 'Produtos', icon: '📦' },
     { id: 'venda', label: 'Vendas', icon: '💰' },
     { id: 'cliente', label: 'Clientes', icon: '👥' },
-  ]
+    { id: 'cobranca', label: 'Cobrança', icon: '💸' }, // ID sem acento para facilitar
+  ];
 
   return (
     <div className="w-64 h-screen bg-white border-r border-slate-200 flex flex-col p-4 fixed left-0 top-0">
@@ -20,7 +21,11 @@ const Sidebar = ({ setTelaAtiva }) => {
           <button
             key={item.id}
             onClick={() => setTelaAtiva(item.id)}
-            className="w-full flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-slate-50 hover:text-emerald-600 rounded-xl transition-all mb-1 font-medium"
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 font-medium ${
+              telaAtiva === item.id 
+                ? 'bg-emerald-50 text-emerald-600 shadow-sm' // Estilo para o item ativo
+                : 'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'
+            }`}
           >
             <span>{item.icon}</span>
             {item.label}
@@ -34,7 +39,7 @@ const Sidebar = ({ setTelaAtiva }) => {
         </button>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Sidebar
+export default Sidebar;

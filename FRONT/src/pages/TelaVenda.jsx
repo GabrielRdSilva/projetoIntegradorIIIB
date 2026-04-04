@@ -18,22 +18,24 @@ const TelaVenda = ({
   itemAtual, setItemAtual, adicionarItem,
   itensVenda, setItensVenda,
   // ADICIONE ESTAS NOVAS AQUI:
-  temEntrada, 
-  setTemEntrada, 
-  dadosEntrada, 
-  setDadosEntrada, 
+  temEntrada,
+  setTemEntrada,
+  dadosEntrada,
+  setDadosEntrada,
   gerarFinanceiro,
   formaPagamento, setFormaPagamento,
   numeroParcelas, setNumeroParcelas,
   valorPagoAVista, setValorPagoAVista,
   dataPagamentoAVista, setDataPagamentoAVista,
-  handleFinalizarVenda
+  handleFinalizarVenda,
+  modoEdicaoVenda // Nova prop
+
 }) => {
 
   const totalItens = itensVenda.reduce((acc, item) => acc + parseFloat(item.TotalVendaVendaDet || 0), 0);
 
   return (
-    <Card title="Lançar Nova Venda">
+    <Card title={modoEdicaoVenda ? "Editar Venda Existente" : "Lançar Nova Venda"}>
       <form className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Input label="Data da Venda" type="date" value={venda.DataVenda} onChange={(e) => setVenda({ ...venda, DataVenda: e.target.value })} />
 
@@ -53,7 +55,8 @@ const TelaVenda = ({
           </select>
         </div>
 
-        <Input label="Cód. Venda (Automático)" value={venda.CodigoVenda} readOnly />
+        <Input label="Cód. Venda (Automático)" value={venda.CodigoVenda} readOnly={modoEdicaoVenda} />
+
 
         <div className="md:col-span-2 relative">
           <Input label="Buscar Cliente (Nome)" placeholder="Digite o nome..." value={buscaCliente} onChange={(e) => setBuscaCliente(e.target.value)} />
@@ -131,7 +134,8 @@ const TelaVenda = ({
             )}
 
             <Button variant="success" type="button" onClick={handleFinalizarVenda} className="w-full py-4 text-xl mt-6">
-              Finalizar e Gravar Venda
+              {modoEdicaoVenda ? "Atualizar Venda" : "Finalizar e Gravar Venda"}
+
             </Button>
 
           </div>

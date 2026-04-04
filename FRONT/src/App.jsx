@@ -10,6 +10,7 @@ import ListaClientes from "./pages/ListaClientes"; // ADICIONE ESTA LINHA
 import ListaProdutos from "./pages/ListaProdutos";
 import ListaVendas from "./pages/ListaVendas";
 import DetalheVenda from "./pages/DetalheVenda";
+import Cobranca from "./pages/Cobranca"; // ADICIONE ESTA LINHA
 
 function App() {
   const [telaAtiva, setTelaAtiva] = useState('home')
@@ -17,6 +18,9 @@ function App() {
   const [modoEdicaoProduto, setModoEdicaoProduto] = useState(false);
   const [listaClientes, setListaClientes] = useState([]);
   const [modoVenda, setModoVenda] = useState('lista'); // 'lista', 'cadastro' ou 'detalhe'
+  const [modoEdicaoVenda, setModoEdicaoVenda] = useState(false); // Novo estado para controlar o modo de edição de venda
+  const [parcelasOriginaisEdicao, setParcelasOriginaisEdicao] = useState([]);
+
   const [vendaEmDetalhe, setVendaEmDetalhe] = useState(null);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [buscaCliente, setBuscaCliente] = useState('')
@@ -140,15 +144,17 @@ function App() {
       carregarClientes();
     }
     if (tela === 'produto') {
-      setModoEdicaoProduto(false); // Reseta para a lista
-      carregarProdutos(); // Atualiza a lista
+      setModoEdicaoProduto(false);
+      carregarProdutos();
     }
     if (tela === 'venda') {
       setModoVenda('lista');
       setVendaEmDetalhe(null);
+      setModoEdicaoVenda(false);
       carregarVendas();
     }
   };
+
 
   // Função para Excluir Produto
   const handleExcluirProduto = async (produto) => {
@@ -204,61 +210,62 @@ function App() {
   };
 
   const gerarFinanceiro = () => {
-    // 1. Calcula o Total da Venda
     const subtotal = itensVenda.reduce((acc, item) => acc + (parseFloat(item.TotalVendaVendaDet) || 0), 0);
     const desconto = parseFloat(venda.DescontoConcedidoVenda) || 0;
-    const totalVenda = subtotal - desconto;
+    const totalVendaAtual = subtotal - desconto;
 
-    // 2. Define o Valor da Entrada (se houver)
-    const valorEntrada = temEntrada ? parseFloat(dadosEntrada.valor) : 0;
-    const valorParaParcelar = totalVenda - valorEntrada;
+    // 1. OLHAMOS PARA O BACKUP: O que já estava pago no banco?
+    const parcelasPagasNoBanco = parcelasOriginaisEdicao.filter(p => p.StatusParcela === 'Paga');
+    const totalJaPagoNoBanco = parcelasPagasNoBanco.reduce((acc, p) => acc + (parseFloat(p.ValorParcela) || 0), 0);
 
-    if (valorParaParcelar < 0) {
-      alert("❌ O valor da entrada não pode ser maior que o total da venda!");
+    // 2. Valor da NOVA Entrada configurada agora
+    const valorNovaEntrada = temEntrada ? parseFloat(dadosEntrada.valor) : 0;
+
+    // 3. Saldo Devedor Real
+    const saldoDevedor = totalVendaAtual - totalJaPagoNoBanco - valorNovaEntrada;
+
+    if (saldoDevedor < -0.01) {
+      alert(`❌ Valor excedido! \nJá Pago: R$ ${totalJaPagoNoBanco.toFixed(2)}\nNova Entrada: R$ ${valorNovaEntrada.toFixed(2)}\nTotal Venda: R$ ${totalVendaAtual.toFixed(2)}`);
       return;
     }
 
-    const novasParcelas = [];
-    const totalParcelasDesejadas = parseInt(numeroParcelas) || 1;
+    // 4. RECONSTRUÇÃO DA LISTA
+    // Começamos com as pagas que vieram do banco
+    const novasParcelas = [...parcelasPagasNoBanco];
 
-    // 3. Adiciona a Entrada como Parcela #1 (se houver)
-    if (temEntrada) {
-      novasParcelas.push({
-        NumeroParcela: 1,
-        ValorParcela: valorEntrada,
-        DataVencimento: dadosEntrada.data,
-        StatusParcela: 'Paga',
-        FormaPagamento: dadosEntrada.forma
-      });
+    // 5. Adicionamos a Nova Entrada (se houver)
+    if (valorNovaEntrada > 0) {
+        novasParcelas.push({
+            NumeroParcela: novasParcelas.length + 1,
+            ValorParcela: valorNovaEntrada, ValorRecebido: valorNovaEntrada,
+            DataVencimento: dadosEntrada.data, DataPagamento: dadosEntrada.data,
+            StatusParcela: 'Paga',
+            FormaPagamento: dadosEntrada.forma,
+            Observacoes: "Nova Entrada (Renegociação)"
+        });
     }
 
-    // 4. Calcula quantas parcelas faltam gerar
-    // Se tem entrada, a entrada já contou como 1, então geramos (Total - 1)
-    const qtdParaGerar = temEntrada ? (totalParcelasDesejadas - 1) : totalParcelasDesejadas;
-
-    if (qtdParaGerar > 0) {
-      const valorCada = parseFloat((valorParaParcelar / qtdParaGerar).toFixed(2));
+    // 6. Geramos as novas parcelas Pendentes
+    const qtdParaGerar = parseInt(numeroParcelas) || 0;
+    if (qtdParaGerar > 0 && saldoDevedor > 0) {
+      const valorCada = parseFloat((saldoDevedor / qtdParaGerar).toFixed(2));
       let dataReferencia = new Date(dataPrimeiraParcela);
 
       for (let i = 1; i <= qtdParaGerar; i++) {
         let dVenc = new Date(dataReferencia);
-
-        // O número da parcela real (se tem entrada, começa do 2)
-        const numReal = temEntrada ? i + 1 : i;
-
         if (i > 1) {
-          // Lógica: Próximo mês, dia 05
           dVenc.setMonth(dVenc.getMonth() + 1);
           dVenc.setDate(5);
           dataReferencia = new Date(dVenc);
         }
 
         novasParcelas.push({
-          NumeroParcela: numReal,
+          NumeroParcela: novasParcelas.length + 1,
           ValorParcela: valorCada,
           DataVencimento: dVenc.toISOString().split('T')[0],
           StatusParcela: 'Pendente',
-          FormaPagamento: 'A Prazo'
+          FormaPagamento: 'A Prazo',
+          Observacoes: "Renegociada"
         });
       }
     }
@@ -333,13 +340,14 @@ function App() {
     setValorPagoAVista(total > 0 ? total : 0)
   }, [itensVenda, venda.DescontoConcedidoVenda])
 
-  // GERAÇÃO DE CÓDIGO DE VENDA ÚNICO E SEGURO
+  // GERAÇÃO DE CÓDIGO DE VENDA ÚNICO E SEGURO (APENAS PARA NOVAS VENDAS)
   useEffect(() => {
-    if (venda.DataVenda && venda.CodigoCliente) {
-      const dataParts = venda.DataVenda.split('-'); // [2026, 04, 03]
+    if (!modoEdicaoVenda && venda.DataVenda && venda.CodigoCliente) {
+      const dataParts = venda.DataVenda.split('-'); // Use aspas simples normais aqui
+
       const ano = dataParts[0].slice(-2); // Pega os últimos 2 dígitos do ano (ex: 26)
       const mes = dataParts[1]; // Mês com 2 dígitos (ex: 04)
-      const dia = dataParts[2]; // Dia com 2 dígitos (ex: 03)
+      const dia = dataParts[2]; // Dia com 2 dígitos (ex: 03]
 
       const ultimosDigitosCliente = venda.CodigoCliente.slice(-4);
 
@@ -352,7 +360,8 @@ function App() {
 
       setVenda(prev => ({ ...prev, CodigoVenda: novoCodigo }));
     }
-  }, [venda.DataVenda, venda.CodigoCliente]);
+  }, [venda.DataVenda, venda.CodigoCliente, modoEdicaoVenda]);
+
 
 
   // Funções de Busca e Gravação (Mesma lógica anterior, mas simplificada)
@@ -434,65 +443,45 @@ function App() {
 
   const handleFinalizarVenda = async () => {
     try {
-      // 1. Cálculos iniciais
       const valorTotalVenda = itensVenda.reduce((acc, item) => acc + (parseFloat(item.TotalVendaVendaDet) || 0), 0);
       const totalFinal = valorTotalVenda - (parseFloat(venda.DescontoConcedidoVenda) || 0);
 
-      if (itensVenda.length === 0) {
-        alert("❌ Adicione pelo menos um item à venda!");
-        return;
-      }
+      if (itensVenda.length === 0) return alert("❌ Adicione itens!");
+      if (parcelasEditaveis.length === 0) return alert("❌ Gere as parcelas!");
 
-      if (parcelasEditaveis.length === 0) {
-        alert("❌ Gere as parcelas antes de finalizar a venda!");
-        return;
-      }
+      const dadosParaEnviar = {
+        vendaData: { ...venda, ValorVenda: valorTotalVenda, TotalVenda: totalFinal },
+        itensVenda: itensVenda,
+        parcelasData: parcelasEditaveis
+      };
 
-      // 2. Gravar a VENDA principal
-      const responseVenda = await axios.post('http://localhost:3000/Vendas', {
-        ...venda,
-        ValorVenda: valorTotalVenda,
-        TotalVenda: totalFinal,
-        DescontoConcedidoVenda: parseFloat(venda.DescontoConcedidoVenda) || 0
-      });
-
-      const codVendaGerado = responseVenda.data.CodigoVenda;
-
-      // 3. Gravar os DETALHES da venda (um por um)
-      for (const item of itensVenda) {
-        await axios.post('http://localhost:3000/DetalhesVenda', {
-          ...item,
-          QuantidadeVendaDet: parseInt(item.QuantidadeVendaDet, 10),
-          ValorUnitarioVendaDet: parseFloat(item.ValorUnitarioVendaDet),
-          TotalVendaVendaDet: parseFloat(item.TotalVendaVendaDet),
-          CodigoVendaDet: codVendaGerado,
-          DataVendaDet: venda.DataVenda
+      if (modoEdicaoVenda && venda.id) {
+        await axios.put(`http://localhost:3000/Vendas/${venda.id}`, dadosParaEnviar);
+        alert('✅ Venda atualizada!');
+      } else {
+        // Lógica de criação original...
+        const res = await axios.post('http://localhost:3000/Vendas', dadosParaEnviar.vendaData);
+        const cod = res.data.CodigoVenda;
+        for (const item of itensVenda) {
+          await axios.post('http://localhost:3000/DetalhesVenda', { ...item, CodigoVendaDet: cod, DataVendaDet: venda.DataVenda });
+        }
+        await axios.post('http://localhost:3000/Parcelas/criar', {
+          CodigoVenda: cod,
+          CodigoFinanceiro: venda.CodigoCliente,
+          listaParcelas: parcelasEditaveis
         });
+        alert('✅ Venda gravada!');
       }
 
-      // 4. Gravar as PARCELAS (Envia a lista completa para a rota de criação em lote)
-      await axios.post('http://localhost:3000/Parcelas/criar', {
-        CodigoVenda: codVendaGerado,
-        CodigoFinanceiro: venda.CodigoCliente,
-        listaParcelas: parcelasEditaveis // Enviamos a lista que você editou na tela
-      });
-
-      // 5. Sucesso e Limpeza
-      alert('✅ Venda e Financeiro gravados com sucesso!');
-
-      // Limpa os estados para a próxima venda
       setTelaAtiva('home');
-      setItensVenda([]);
-      setParcelasEditaveis([]);
-      setBuscaCliente('');
-      setExibirItens(false);
-      setDebugData(null); // Limpa o quadro de teste se ainda estiver aberto
-
+      setModoVenda('lista');
+      setModoEdicaoVenda(false);
     } catch (error) {
-      console.error("Erro ao finalizar venda:", error);
-      alert('❌ Erro ao gravar no banco: ' + (error.response?.data?.error || error.message));
+      alert('❌ Erro: ' + error.message);
     }
   };
+
+
 
   const handleSalvarProduto = async (e) => {
     e.preventDefault();
@@ -612,13 +601,57 @@ function App() {
               />
             )
           )}
-
+          {telaAtiva === 'cobranca' && <Cobranca />}
           {telaAtiva === 'venda' && (
             modoVenda === 'lista' ? (
               <ListaVendas
                 vendas={listaVendas}
-                aoNovaVenda={() => setModoVenda('cadastro')}
+                aoNovaVenda={() => {
+                  setModoEdicaoVenda(false); // Garante que é uma nova venda
+                  setVenda({
+                    DataVenda: new Date().toISOString().split('T')[0],
+                    CodigoVenda: '', VendedorVenda: 'Gabriel Rodrigues', TipoVenda: 'Avista',
+                    CodigoCliente: '', ReferenciaCliente: '', NomeCliente: '',
+                    ValorVenda: 0, DescontoConcedidoVenda: 0, TotalVenda: 0
+                  });
+                  setItensVenda([]);
+                  setParcelasEditaveis([]);
+                  setModoVenda('cadastro');
+                }}
                 aoDetalhar={(v) => { setVendaEmDetalhe(v); setModoVenda('detalhe'); }}
+                aoEditarVenda={async (vendaId) => {
+                  try {
+                    const response = await axios.get(`http://localhost:3000/Vendas/${vendaId}`);
+                    const vendaCarregada = response.data;
+
+                    vendaCarregada.DataVenda = vendaCarregada.DataVenda.split('T')[0];
+                    setVenda(vendaCarregada);
+
+                    setItensVenda(vendaCarregada.itensVenda.map(item => ({
+                      ...item,
+                      DataVendaDet: item.DataVendaDet.split('T')[0],
+                      idTemporario: item.id
+                    })));
+
+                    // SALVAMOS AS PARCELAS ORIGINAIS AQUI
+                    const parcelasFormatadas = vendaCarregada.parcelas.map(p => ({
+                      ...p,
+                      DataVencimento: p.DataVencimento.split('T')[0],
+                      DataPagamento: p.DataPagamento ? p.DataPagamento.split('T')[0] : null,
+                      ValorParcela: parseFloat(p.ValorParcela)
+                    }));
+
+                    setParcelasEditaveis(parcelasFormatadas);
+                    setParcelasOriginaisEdicao(parcelasFormatadas); // BACKUP PARA RENEGOCIAÇÃO
+
+                    setModoEdicaoVenda(true);
+                    setModoVenda('cadastro');
+                  } catch (error) {
+                    console.error("Erro ao carregar venda:", error);
+                    alert("❌ Erro ao carregar venda.");
+                  }
+                }}
+
                 filtros={filtrosVendas}
                 setFiltros={setFiltrosVendas}
                 aoBuscar={carregarVendas}
@@ -626,8 +659,8 @@ function App() {
             ) : modoVenda === 'cadastro' ? (
               <TelaVenda
                 venda={venda} setVenda={setVenda} buscaCliente={buscaCliente} setBuscaCliente={setBuscaCliente}
-                dataPrimeiraParcela={dataPrimeiraParcela} // ADICIONE ESTA
-                setDataPrimeiraParcela={setDataPrimeiraParcela} // ADICIONE ESTA
+                dataPrimeiraParcela={dataPrimeiraParcela}
+                setDataPrimeiraParcela={setDataPrimeiraParcela}
                 temEntrada={temEntrada}
                 setTemEntrada={setTemEntrada}
                 dadosEntrada={dadosEntrada}
@@ -643,10 +676,12 @@ function App() {
                 numeroParcelas={numeroParcelas} setNumeroParcelas={setNumeroParcelas} valorPagoAVista={valorPagoAVista}
                 setValorPagoAVista={setValorPagoAVista} dataPagamentoAVista={dataPagamentoAVista} setDataPagamentoAVista={setDataPagamentoAVista}
                 handleFinalizarVenda={handleFinalizarVenda}
+                modoEdicaoVenda={modoEdicaoVenda} // Passa o modo de edição para TelaVenda
               />
-          ) : (
-          <DetalheVenda venda={vendaEmDetalhe} aoVoltar={() => setModoVenda('lista')} />
+            ) : (
+              <DetalheVenda venda={vendaEmDetalhe} aoVoltar={() => setModoVenda('lista')} />
             ))}
+
         </div>
       </main>
     </div>
