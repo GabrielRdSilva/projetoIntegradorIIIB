@@ -6,9 +6,15 @@ import Dashboard from "./pages/Dashboard";
 import TelaProduto from "./pages/TelaProduto";
 import TelaVenda from "./pages/TelaVenda";
 import TelaCliente from "./pages/TelaCliente"; // ADICIONE ESTA LINHA
+import ListaClientes from "./pages/ListaClientes"; // ADICIONE ESTA LINHA
+import ListaProdutos from "./pages/ListaProdutos";
 
 function App() {
   const [telaAtiva, setTelaAtiva] = useState('home')
+  const [listaProdutos, setListaProdutos] = useState([]);
+  const [modoEdicaoProduto, setModoEdicaoProduto] = useState(false);
+  const [listaClientes, setListaClientes] = useState([]);
+  const [modoEdicao, setModoEdicao] = useState(false);
   const [buscaCliente, setBuscaCliente] = useState('')
   const [clientesFiltrados, setClientesFiltrados] = useState([])
   const [buscaProduto, setBuscaProduto] = useState('')
@@ -28,7 +34,7 @@ function App() {
     valor: 0, data: new Date().toISOString().split('T')[0], forma: 'Pix', status: 'Paga'
   });
   const [produto, setProduto] = useState({
-    CodigoProd: '', CodigoForn: '', FornecedorNome: '', LocalForn: '',
+    id: null, CodigoProd: '', CodigoForn: '', FornecedorNome: '', LocalForn: '',
     TipoProd: '', DescricaoProd: '', MaterialProd: '', QuantidadeProd: '',
     ValorOriginalProd: '', DescontoAplicadoProd: '', EmbalagemProd: 'não',
     CustoProd: 0, ValorEmbalagemProd: 0, CustoTotalProd: 0,
@@ -43,6 +49,7 @@ function App() {
   })
   // 1. Estado Inicial Ajustado
   const [novoCliente, setNovoCliente] = useState({
+    id: null,           // ← ADICIONE ESTA LINHA
     codCliente: `CLIEN-${Math.floor(1000 + Math.random() * 9000)}`,
     Nome: '',
     Email: '',
@@ -50,9 +57,10 @@ function App() {
     Endereco: '',
     Contato: '' // Será convertido para Int no envio
   });
-    const buscarProximoCodigoCliente = async () => {
+
+  const buscarProximoCodigoCliente = async () => {
     try {
-      const response = await axios.get('http://localhost:3000/clientes/proximo-codigo' );
+      const response = await axios.get('http://localhost:3000/clientes/proximo-codigo');
       setNovoCliente(prev => ({ ...prev, codCliente: response.data.proximoCodigo }));
     } catch (error) {
       console.error("Erro ao buscar próximo código:", error);
@@ -65,8 +73,72 @@ function App() {
       buscarProximoCodigoCliente();
     }
   }, [telaAtiva]);
+  // Carregar clientes do banco
+  const carregarClientes = async () => {
+    try {
+      const response = await axios.get('http://localhost:3000/clientes');
+      setListaClientes(response.data);
+    } catch (error) {
+      console.error("Erro ao carregar clientes:", error);
+    }
+  };
 
-    const handleSalvarCliente = async (e) => {
+  useEffect(() => {
+    if (telaAtiva === 'cliente') carregarClientes();
+  }, [telaAtiva]);
+
+  // Função para Excluir
+  const handleExcluirCliente = async (cliente) => {
+    const confirmou = window.confirm(`⚠️ Tem certeza que deseja excluir o cliente "${cliente.Nome}"?\nEsta ação não pode ser desfeita.`);
+
+    if (confirmou) {
+      try {
+        await axios.delete(`http://localhost:3000/clientes/${cliente.id}`);
+        alert('✅ Cliente excluído com sucesso!');
+        carregarClientes(); // Recarrega a lista
+      } catch (error) {
+        alert('❌ Erro ao excluir: ' + error.message);
+      }
+    }
+  };
+  // Carregar produtos do banco
+  const carregarProdutos = async () => {
+    try {
+      const response = await axios.get('http://localhost:3000/Produtos');
+      setListaProdutos(response.data);
+    } catch (error) {
+      console.error("Erro ao carregar produtos:", error);
+    }
+  };
+
+  // Atualizar a navegação para resetar o modo de edição de produtos também
+  const navegarPara = (tela) => {
+    setTelaAtiva(tela);
+    if (tela === 'cliente') {
+      setModoEdicao(false);
+      carregarClientes();
+    }
+    if (tela === 'produto') {
+      setModoEdicaoProduto(false); // Reseta para a lista
+      carregarProdutos(); // Atualiza a lista
+    }
+  };
+
+  // Função para Excluir Produto
+  const handleExcluirProduto = async (produto) => {
+    const confirmou = window.confirm(`⚠️ Deseja excluir o produto "${produto.DescricaoProd}"?\nEsta ação é permanente.`);
+    if (confirmou) {
+      try {
+        await axios.delete(`http://localhost:3000/Produtos/${produto.id}`);
+        alert('✅ Produto removido com sucesso!');
+        carregarProdutos();
+      } catch (error) {
+        alert('❌ Erro ao excluir: ' + error.message);
+      }
+    }
+  };
+
+  const handleSalvarCliente = async (e) => {
     e.preventDefault();
     try {
       const dadosParaEnviar = {
@@ -74,25 +146,36 @@ function App() {
         Contato: parseInt(novoCliente.Contato, 10) || 0
       };
 
-      await axios.post('http://localhost:3000/clientes', dadosParaEnviar );
-      alert('✅ Cliente gravado com sucesso!');
-      
-      // Busca o próximo código para o próximo cadastro
-      await buscarProximoCodigoCliente();
-      
-      // Limpa apenas os campos de texto, mantendo o novo código
-      setNovoCliente(prev => ({
-        ...prev,
-        Nome: '', Email: '', Referencia: '', Endereco: '', Contato: ''
-      }));
-      
+      // Verifica se é edição (se existe id)
+      if (novoCliente.id) {
+        // PUT para atualizar
+        await axios.put(`http://localhost:3000/clientes/${novoCliente.id}`, dadosParaEnviar);
+        alert('✅ Cliente atualizado com sucesso!');
+      } else {
+        // POST para criar novo
+        await axios.post('http://localhost:3000/clientes', dadosParaEnviar);
+        alert('✅ Cliente gravado com sucesso!');
+        await buscarProximoCodigoCliente(); // só gera novo código se for criação
+
+        // Limpa os campos (mantendo o novo código)
+        setNovoCliente(prev => ({
+          ...prev,
+          Nome: '', Email: '', Referencia: '', Endereco: '', Contato: ''
+        }));
+      }
+
       setTelaAtiva('home');
+      carregarClientes(); // recarrega a lista
+      setModoEdicao(false); // sai do modo edição
     } catch (error) {
-      alert('❌ Erro ao gravar cliente: ' + error.message);
+      alert('❌ Erro ao salvar cliente: ' + error.message);
     }
   };
 
-
+  const handleChangeProduto = (e) => {
+    const { name, value } = e.target;
+    setProduto(prev => ({ ...prev, [name]: value }));
+  };
 
   const gerarFinanceiro = () => {
     // 1. Calcula o Total da Venda
@@ -329,6 +412,11 @@ function App() {
     }
   }, [itensVenda, venda.DescontoConcedidoVenda, venda.TipoVenda]);
 
+  useEffect(() => {
+    if (telaAtiva === 'produto') {
+      carregarProdutos();
+    }
+  }, [telaAtiva]);
   // BUSCA DE PRODUTOS ENQUANTO DIGITA
   useEffect(() => {
     const buscarProdutos = async () => {
@@ -415,12 +503,51 @@ function App() {
     }
   };
 
+  const handleSalvarProduto = async (e) => {
+    e.preventDefault();
+    try {
+      if (produto.id) {
+        // Edição: PUT
+        await axios.put(`http://localhost:3000/Produtos/${produto.id}`, produto);
+        alert('✅ Produto atualizado com sucesso!');
+      } else {
+        // Criação: POST
+        await axios.post('http://localhost:3000/Produtos', produto);
+        alert('✅ Produto cadastrado com sucesso!');
+      }
+      // Após salvar, volta para a lista e recarrega os produtos
+      setModoEdicaoProduto(false);
+      carregarProdutos(); // função que busca a lista atualizada
+    } catch (error) {
+      console.error(error);
+      alert('❌ Erro ao salvar produto: ' + error.message);
+    }
+  };
 
+  // Função chamada ao clicar em "Novo Produto"
+  // ✅ CORRETO
+  const aoNovoProduto = () => {
+    setProduto({
+      id: null,
+      CodigoProd: '', CodigoForn: '', FornecedorNome: '', LocalForn: '',
+      TipoProd: '', DescricaoProd: '', MaterialProd: '', QuantidadeProd: '',
+      ValorOriginalProd: '', DescontoAplicadoProd: '', EmbalagemProd: 'não',
+      CustoProd: 0, ValorEmbalagemProd: 0, CustoTotalProd: 0,
+      PorcentagemAcrescidaProd: '', ValorSugeridoProd: 0, ValorCorrigidoProd: '',
+      PorcentagemLucroProd: 0, LucroProd: 0
+    });
+    setModoEdicaoProduto(true);
+  };
 
+  // Função chamada ao clicar em "Editar" em um produto da lista
+  const aoEditarProduto = (p) => {
+    setProduto(p); // p já contém id e todos os campos
+    setModoEdicaoProduto(true);
+  };
 
   return (
     <div className="flex bg-slate-50 min-h-screen font-sans text-slate-900">
-      <Sidebar setTela={setTelaAtiva} />
+      <Sidebar setTelaAtiva={navegarPara} telaAtiva={telaAtiva} />
       <main className="flex-1 ml-64 p-8">
         <header className="flex justify-between items-center mb-10 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
           <div>
@@ -438,30 +565,61 @@ function App() {
         <div className="max-w-5xl mx-auto">
           {telaAtiva === 'home' && <Dashboard />}
           {telaAtiva === 'produto' && (
-            <TelaProduto
-              produto={produto}
-              handleChange={(e) => setProduto({ ...produto, [e.target.name]: e.target.value })}
-              handleSubmit={async (e) => {
-                e.preventDefault(); // Impede a página de recarregar
-                try {
-                  console.log("Enviando produto:", produto); // Adicione este log para testar no F12
-                  await axios.post('http://localhost:3000/Produtos', produto);
-                  alert('✅ Produto cadastrado com sucesso!');
-                  setTelaAtiva('home');
-                } catch (error) {
-                  console.error("Erro ao cadastrar:", error);
-                  alert('❌ Erro ao cadastrar produto. Verifique se o servidor está rodando.');
-                }
-              }}
-            />
+            modoEdicaoProduto ? (
+              <TelaProduto
+                produto={produto}
+                handleChange={handleChangeProduto} // Use sua função de cálculo de lucro aqui
+                handleSubmit={handleSalvarProduto}
+                aoCancelar={() => setModoEdicaoProduto(false)}
+              />
+            ) : (
+              <ListaProdutos
+                produtos={listaProdutos}
+                aoEditar={aoEditarProduto}
+                aoExcluir={handleExcluirProduto}
+                aoNovo={aoNovoProduto}
+              />
+            )
           )}
+
           {telaAtiva === 'cliente' && (
-            <TelaCliente
-              cliente={novoCliente}
-              handleChange={(e) => setNovoCliente({ ...novoCliente, [e.target.name]: e.target.value })}
-              handleSubmit={handleSalvarCliente}
-            />
+            modoEdicao ? (
+              <TelaCliente
+                cliente={novoCliente}
+                handleChange={(e) => setNovoCliente({ ...novoCliente, [e.target.name]: e.target.value })}
+                handleSubmit={handleSalvarCliente}
+                aoCancelar={() => setModoEdicao(false)}
+              />
+            ) : (
+              <ListaClientes
+                clientes={listaClientes}
+                aoEditar={(c) => {
+                  // Aqui sim você define o que acontece ao clicar em Editar
+                  setNovoCliente({
+                    id: c.id,
+                    codCliente: c.codCliente,
+                    Nome: c.Nome,
+                    Email: c.Email,
+                    Referencia: c.Referencia,
+                    Endereco: c.Endereco,
+                    Contato: c.Contato
+                  });
+                  setModoEdicao(true);
+                }}
+                aoExcluir={handleExcluirCliente}
+                aoNovo={() => {
+                  setNovoCliente({
+                    id: null,
+                    codCliente: `CLIEN-${Math.floor(1000 + Math.random() * 9000)}`,
+                    Nome: '', Email: '', Referencia: '', Endereco: '', Contato: ''
+                  });
+                  setModoEdicao(true);
+                  buscarProximoCodigoCliente();
+                }}
+              />
+            )
           )}
+
           {telaAtiva === 'venda' && <TelaVenda
             venda={venda} setVenda={setVenda} buscaCliente={buscaCliente} setBuscaCliente={setBuscaCliente}
             dataPrimeiraParcela={dataPrimeiraParcela} // ADICIONE ESTA

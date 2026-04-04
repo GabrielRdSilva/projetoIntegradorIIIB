@@ -1,6 +1,6 @@
-import React from 'react'
+import React from  "react"
 
-const Sidebar = ({ setTela }) => {
+const Sidebar = ({ setTelaAtiva }) => {
   const menuItems = [
     { id: 'home', label: 'Dashboard', icon: '📊' },
     { id: 'produto', label: 'Produtos', icon: '📦' },
@@ -19,7 +19,7 @@ const Sidebar = ({ setTela }) => {
         {menuItems.map((item) => (
           <button
             key={item.id}
-            onClick={() => setTela(item.id)}
+            onClick={() => setTelaAtiva(item.id)}
             className="w-full flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-slate-50 hover:text-emerald-600 rounded-xl transition-all mb-1 font-medium"
           >
             <span>{item.icon}</span>

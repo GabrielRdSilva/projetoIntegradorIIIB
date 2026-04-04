@@ -5,9 +5,9 @@ import Card from "../components/Card";
 import { BadgeValue, BadgeContainer } from "../components/Typography";
 
 
-const TelaProduto = ({ produto, handleChange, handleSubmit }) => {
+const TelaProduto = ({ produto, handleChange, handleSubmit, aoCancelar}) => {
   return (
-    <Card title="Novo Produto">
+    <Card title={produto.id ? "Editar Produto" : "Novo Produto"}>
       <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Input label="Cód. Produto" name="CodigoProd" value={produto.CodigoProd} onChange={handleChange} />
         <Input label="Cód. Fornecedor" name="CodigoForn" value={produto.CodigoForn} onChange={handleChange} />
@@ -40,9 +40,12 @@ const TelaProduto = ({ produto, handleChange, handleSubmit }) => {
           <BadgeValue label="Lucro %" value={`${produto.PorcentagemLucroProd}%`} color="orange" />
         </BadgeContainer>
 
-        <div className="col-span-full mt-6">
-          <Button variant="success" type="submit" className="w-full py-4 text-lg">
-            Cadastrar Produto
+        <div className="col-span-full mt-6 flex gap-4">
+          <Button variant="secondary" type="button" onClick={aoCancelar} className="flex-1 py-4 text-lg">
+            ⬅️ Voltar para Lista
+          </Button>
+          <Button variant="success" type="submit" className="flex-[2] py-4 text-lg">
+            {produto.id ? "💾 Salvar Alterações" : "✅ Cadastrar Produto"}
           </Button>
         </div>
       </form>
