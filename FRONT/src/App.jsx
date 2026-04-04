@@ -8,12 +8,16 @@ import TelaVenda from "./pages/TelaVenda";
 import TelaCliente from "./pages/TelaCliente"; // ADICIONE ESTA LINHA
 import ListaClientes from "./pages/ListaClientes"; // ADICIONE ESTA LINHA
 import ListaProdutos from "./pages/ListaProdutos";
+import ListaVendas from "./pages/ListaVendas";
+import DetalheVenda from "./pages/DetalheVenda";
 
 function App() {
   const [telaAtiva, setTelaAtiva] = useState('home')
   const [listaProdutos, setListaProdutos] = useState([]);
   const [modoEdicaoProduto, setModoEdicaoProduto] = useState(false);
   const [listaClientes, setListaClientes] = useState([]);
+  const [modoVenda, setModoVenda] = useState('lista'); // 'lista', 'cadastro' ou 'detalhe'
+  const [vendaEmDetalhe, setVendaEmDetalhe] = useState(null);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [buscaCliente, setBuscaCliente] = useState('')
   const [clientesFiltrados, setClientesFiltrados] = useState([])
@@ -30,6 +34,9 @@ function App() {
   const [valorPagoAVista, setValorPagoAVista] = useState(0)
   const [totalFinalVenda, setTotalFinalVenda] = useState(0);
   const [temEntrada, setTemEntrada] = useState(false);
+  // Novos estados para Vendas
+  const [listaVendas, setListaVendas] = useState([]);
+  const [filtrosVendas, setFiltrosVendas] = useState({ nomeCliente: '', codCliente: '', dataVenda: '' });
   const [dadosEntrada, setDadosEntrada] = useState({
     valor: 0, data: new Date().toISOString().split('T')[0], forma: 'Pix', status: 'Paga'
   });
@@ -110,6 +117,20 @@ function App() {
       console.error("Erro ao carregar produtos:", error);
     }
   };
+  const carregarVendas = async () => {
+    try {
+      // Construir query string para filtros
+      const params = new URLSearchParams();
+      if (filtrosVendas.nomeCliente) params.append('nome', filtrosVendas.nomeCliente);
+      if (filtrosVendas.codCliente) params.append('codCliente', filtrosVendas.codCliente);
+      if (filtrosVendas.dataVenda) params.append('data', filtrosVendas.dataVenda);
+
+      const response = await axios.get(`http://localhost:3000/Vendas?${params.toString()}`);
+      setListaVendas(response.data);
+    } catch (error) {
+      console.error("Erro ao carregar vendas:", error);
+    }
+  };
 
   // Atualizar a navegação para resetar o modo de edição de produtos também
   const navegarPara = (tela) => {
@@ -121,6 +142,11 @@ function App() {
     if (tela === 'produto') {
       setModoEdicaoProduto(false); // Reseta para a lista
       carregarProdutos(); // Atualiza a lista
+    }
+    if (tela === 'venda') {
+      setModoVenda('lista');
+      setVendaEmDetalhe(null);
+      carregarVendas();
     }
   };
 
@@ -275,41 +301,6 @@ function App() {
     setParcelasEditaveis(novas);
   }, [totalFinalVenda, venda.TipoVenda, numeroParcelas, dataPrimeiraParcela, dataPagamentoAVista, formaPagamento]);
 
-
-  // GERAÇÃO DE PARCELAS (Lógica completa dentro do efeito)
-  useEffect(() => {
-    if (totalFinalVenda <= 0) {
-      setParcelasEditaveis([]);
-      return;
-    }
-
-    const numParc = venda.TipoVenda === 'Avista' ? 1 : (parseInt(numeroParcelas) || 1);
-    const valorCada = parseFloat((totalFinalVenda / numParc).toFixed(2));
-    const novas = [];
-
-    // Pega a data base do formulário
-    let dataReferencia = new Date(venda.TipoVenda === 'Avista' ? dataPagamentoAVista : dataPrimeiraParcela);
-
-    for (let i = 1; i <= numParc; i++) {
-      let dVenc = new Date(dataReferencia);
-
-      if (i > 1) {
-        // Lógica: Próximo mês, dia 05
-        dVenc.setMonth(dVenc.getMonth() + 1);
-        dVenc.setDate(5);
-        dataReferencia = new Date(dVenc);
-      }
-
-      novas.push({
-        NumeroParcela: i,
-        ValorParcela: valorCada,
-        DataVencimento: dVenc.toISOString().split('T')[0],
-        StatusParcela: (venda.TipoVenda === 'Avista') ? 'Paga' : 'Pendente',
-        FormaPagamento: (venda.TipoVenda === 'Avista') ? formaPagamento : 'A Prazo'
-      });
-    }
-    setParcelasEditaveis(novas);
-  }, [totalFinalVenda, venda.TipoVenda, numeroParcelas, dataPrimeiraParcela, dataPagamentoAVista, formaPagamento]);
 
 
   const [itemAtual, setItemAtual] = useState({
@@ -545,6 +536,8 @@ function App() {
     setModoEdicaoProduto(true);
   };
 
+
+
   return (
     <div className="flex bg-slate-50 min-h-screen font-sans text-slate-900">
       <Sidebar setTelaAtiva={navegarPara} telaAtiva={telaAtiva} />
@@ -620,50 +613,41 @@ function App() {
             )
           )}
 
-          {telaAtiva === 'venda' && <TelaVenda
-            venda={venda} setVenda={setVenda} buscaCliente={buscaCliente} setBuscaCliente={setBuscaCliente}
-            dataPrimeiraParcela={dataPrimeiraParcela} // ADICIONE ESTA
-            setDataPrimeiraParcela={setDataPrimeiraParcela} // ADICIONE ESTA
-            temEntrada={temEntrada}
-            setTemEntrada={setTemEntrada}
-            dadosEntrada={dadosEntrada}
-            setDadosEntrada={setDadosEntrada}
-            gerarFinanceiro={gerarFinanceiro}
-            parcelasEditaveis={parcelasEditaveis}
-            setParcelasEditaveis={setParcelasEditaveis}
-            clientesFiltrados={clientesFiltrados} selecionarCliente={selecionarCliente} exibirItens={exibirItens}
-            setExibirItens={setExibirItens} buscaProduto={buscaProduto} setBuscaProduto={setBuscaProduto}
-            produtosFiltrados={produtosFiltrados} selecionarProduto={selecionarProduto} itemAtual={itemAtual}
-            setItemAtual={setItemAtual} adicionarItem={() => { setItensVenda([...itensVenda, { ...itemAtual, idTemporario: Date.now() }]); setBuscaProduto(''); setItemAtual({ ...itemAtual, CodigoProdVendaDet: '' }) }}
-            itensVenda={itensVenda} setItensVenda={setItensVenda} formaPagamento={formaPagamento} setFormaPagamento={setFormaPagamento}
-            numeroParcelas={numeroParcelas} setNumeroParcelas={setNumeroParcelas} valorPagoAVista={valorPagoAVista}
-            setValorPagoAVista={setValorPagoAVista} dataPagamentoAVista={dataPagamentoAVista} setDataPagamentoAVista={setDataPagamentoAVista}
-            handleFinalizarVenda={handleFinalizarVenda}
-          />}
+          {telaAtiva === 'venda' && (
+            modoVenda === 'lista' ? (
+              <ListaVendas
+                vendas={listaVendas}
+                aoNovaVenda={() => setModoVenda('cadastro')}
+                aoDetalhar={(v) => { setVendaEmDetalhe(v); setModoVenda('detalhe'); }}
+                filtros={filtrosVendas}
+                setFiltros={setFiltrosVendas}
+                aoBuscar={carregarVendas}
+              />
+            ) : modoVenda === 'cadastro' ? (
+              <TelaVenda
+                venda={venda} setVenda={setVenda} buscaCliente={buscaCliente} setBuscaCliente={setBuscaCliente}
+                dataPrimeiraParcela={dataPrimeiraParcela} // ADICIONE ESTA
+                setDataPrimeiraParcela={setDataPrimeiraParcela} // ADICIONE ESTA
+                temEntrada={temEntrada}
+                setTemEntrada={setTemEntrada}
+                dadosEntrada={dadosEntrada}
+                setDadosEntrada={setDadosEntrada}
+                gerarFinanceiro={gerarFinanceiro}
+                parcelasEditaveis={parcelasEditaveis}
+                setParcelasEditaveis={setParcelasEditaveis}
+                clientesFiltrados={clientesFiltrados} selecionarCliente={selecionarCliente} exibirItens={exibirItens}
+                setExibirItens={setExibirItens} buscaProduto={buscaProduto} setBuscaProduto={setBuscaProduto}
+                produtosFiltrados={produtosFiltrados} selecionarProduto={selecionarProduto} itemAtual={itemAtual}
+                setItemAtual={setItemAtual} adicionarItem={() => { setItensVenda([...itensVenda, { ...itemAtual, idTemporario: Date.now() }]); setBuscaProduto(''); setItemAtual({ ...itemAtual, CodigoProdVendaDet: '' }) }}
+                itensVenda={itensVenda} setItensVenda={setItensVenda} formaPagamento={formaPagamento} setFormaPagamento={setFormaPagamento}
+                numeroParcelas={numeroParcelas} setNumeroParcelas={setNumeroParcelas} valorPagoAVista={valorPagoAVista}
+                setValorPagoAVista={setValorPagoAVista} dataPagamentoAVista={dataPagamentoAVista} setDataPagamentoAVista={setDataPagamentoAVista}
+                handleFinalizarVenda={handleFinalizarVenda}
+              />
+          ) : (
+          <DetalheVenda venda={vendaEmDetalhe} aoVoltar={() => setModoVenda('lista')} />
+            ))}
         </div>
-        {debugData && (
-          <div className="mt-10 p-6 bg-slate-900 text-emerald-400 rounded-3xl font-mono text-xs overflow-auto max-h-[500px] border-4 border-emerald-500">
-            <div className="flex justify-between mb-4">
-              <h2 className="text-xl font-bold uppercase underline">Resumo do Envio (TESTE)</h2>
-              <button onClick={() => setDebugData(null)} className="bg-red-500 text-white px-4 py-1 rounded-lg">Fechar Teste</button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <h3 className="text-white font-bold mb-2">TABELA: VENDA</h3>
-                <pre>{JSON.stringify(debugData.venda, null, 2)}</pre>
-              </div>
-              <div>
-                <h3 className="text-white font-bold mb-2">TABELA: DETALHES VENDA</h3>
-                <pre>{JSON.stringify(debugData.detalhes, null, 2)}</pre>
-              </div>
-              <div>
-                <h3 className="text-white font-bold mb-2">OBJETO PARA GERAR PARCELAS</h3>
-                <pre>{JSON.stringify(debugData.parcelas, null, 2)}</pre>
-              </div>
-            </div>
-          </div>
-        )}
       </main>
     </div>
   )
