@@ -1,74 +1,103 @@
-import React, { useState } from "react";
-import Button from "../components/Button";
-import Card from "../components/Card";
-import Input from "../components/Input";
-import { LabelVenda } from "../components/Typography";
+import React from "react";
+import { format } from "date-fns";
 
 const ListaVendas = ({ vendas, aoNovaVenda, aoDetalhar, filtros, setFiltros, aoBuscar }) => {
-  return (
-    <Card title="Histórico de Vendas">
-      {/* Área de Filtros */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-        <Input 
-          label="Nome do Cliente" 
-          value={filtros.nomeCliente} 
-          onChange={(e) => setFiltros({...filtros, nomeCliente: e.target.value})}
-          placeholder="Buscar por nome..."
-        />
-        <Input 
-          label="Cód. Cliente" 
-          value={filtros.codCliente} 
-          onChange={(e) => setFiltros({...filtros, codCliente: e.target.value})}
-          placeholder="CLIEN-..."
-        />
-        <Input 
-          label="Data da Venda" 
-          type="date"
-          value={filtros.dataVenda} 
-          onChange={(e) => setFiltros({...filtros, dataVenda: e.target.value})}
-        />
-        <div className="flex items-end gap-2">
-          <Button variant="primary" onClick={aoBuscar} className="flex-1">🔍 Filtrar</Button>
-          <Button variant="success" onClick={aoNovaVenda} className="flex-1">➕ Nova</Button>
-        </div>
-      </div>
+    const handleFiltroChange = (e) => {
+        const { name, value } = e.target;
+        setFiltros(prev => ({ ...prev, [name]: value }));
+    };
 
-      {/* Tabela de Vendas */}
-      <div className="overflow-x-auto border border-slate-100 rounded-2xl">
-        <table className="w-full text-left border-collapse">
-          <thead className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-            <tr>
-              <th className="p-4">Cód. Venda</th>
-              <th className="p-4">Data</th>
-              <th className="p-4">Cliente</th>
-              <th className="p-4">Total</th>
-              <th className="p-4">Tipo</th>
-              <th className="p-4 text-center">Ações</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {vendas.map((v) => (
-              <tr key={v.id} className="text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                <td className="p-4 font-mono font-bold text-blue-600">{v.CodigoVenda}</td>
-                <td className="p-4">{new Date(v.DataVenda).toLocaleDateString('pt-BR')}</td>
-                <td className="p-4 font-semibold">{v.NomeCliente}</td>
-                <td className="p-4 font-bold text-emerald-600">R$ {v.TotalVenda.toFixed(2)}</td>
-                <td className="p-4">
-                  <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${v.TipoVenda === 'Avista' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
-                    {v.TipoVenda === 'Avista' ? 'À VISTA' : 'A PRAZO'}
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <Button variant="secondary" onClick={() => aoDetalhar(v)} className="py-1 px-3 text-xs">
-                    👁️ Detalhar
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Card>
-  )
-}
-export default ListaVendas
+    return (
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-slate-800">Gestão de Vendas</h2>
+                <button
+                    onClick={aoNovaVenda}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-5 rounded-xl shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                    + Nova Venda
+                </button>
+            </div>
+
+            {/* Filtros */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                <div className="flex flex-col gap-1">
+                    <label className="text-sm font-bold text-slate-700">Nome do Cliente</label>
+                    <input
+                        type="text"
+                        name="nomeCliente"
+                        value={filtros.nomeCliente}
+                        onChange={handleFiltroChange}
+                        placeholder="Buscar por nome..."
+                        className="border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all hover:border-emerald-300 bg-slate-50/50"
+                    />
+                </div>
+                <div className="flex flex-col gap-1">
+                    <label className="text-sm font-bold text-slate-700">Cód. Cliente</label>
+                    <input
+                        type="text"
+                        name="codCliente"
+                        value={filtros.codCliente}
+                        onChange={handleFiltroChange}
+                        placeholder="Buscar por código..."
+                        className="border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all hover:border-emerald-300 bg-slate-50/50"
+                    />
+                </div>
+                <div className="flex flex-col gap-1">
+                    <label className="text-sm font-bold text-slate-700">Data da Venda</label>
+                    <input
+                        type="date"
+                        name="dataVenda"
+                        value={filtros.dataVenda}
+                        onChange={handleFiltroChange}
+                        className="border border-slate-200 p-2.5 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all hover:border-emerald-300 bg-slate-50/50"
+                    />
+                </div>
+                <div className="md:col-span-3 flex justify-end">
+                    <button
+                        onClick={aoBuscar}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-5 rounded-xl shadow-sm transition-all active:scale-95"
+                    >
+                        Aplicar Filtros
+                    </button>
+                </div>
+            </div>
+
+            {/* Tabela */}
+            <div className="overflow-hidden border border-slate-200 rounded-2xl">
+                <table className="min-w-full text-left border-collapse">
+                    <thead className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                        <tr>
+                            <th className="p-4">Cód. Venda</th>
+                            <th className="p-4">Cliente</th>
+                            <th className="p-4">Data</th>
+                            <th className="p-4">Total</th>
+                            <th className="p-4">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {vendas.map((v) => (
+                            <tr key={v.id} className="text-sm text-slate-700 hover:bg-slate-50">
+                                <td className="p-4 font-bold">{v.CodigoVenda}</td>
+                                <td className="p-4">{v.NomeCliente}</td>
+                                <td className="p-4">
+                                    {(() => {
+                                        // Divide a string "YYYY-MM-DD" e cria a data usando valores locais
+                                        const [ano, mes, dia] = v.DataVenda.split('T')[0].split('-');
+                                        return `${dia}/${mes}/${ano}`;
+                                    })()}
+                                </td>
+                                <td className="p-4 font-bold">R$ {v.TotalVenda}</td>
+                                <td className="p-4">
+                                    <button onClick={() => aoDetalhar(v)} className="text-blue-600 font-bold">Detalhes</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
+export default ListaVendas;
