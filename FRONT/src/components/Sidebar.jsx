@@ -1,12 +1,12 @@
 import React from "react";
 
-const Sidebar = ({ setTelaAtiva, telaAtiva }) => { // Adicionei telaAtiva aqui
+const Sidebar = ({ setTelaAtiva, telaAtiva }) => { 
   const menuItems = [
     { id: 'home', label: 'Dashboard', icon: '📊' },
     { id: 'produto', label: 'Produtos', icon: '📦' },
     { id: 'venda', label: 'Vendas', icon: '💰' },
     { id: 'cliente', label: 'Clientes', icon: '👥' },
-    { id: 'cobranca', label: 'Cobrança', icon: '💸' }, // ID sem acento para facilitar
+    { id: 'cobranca', label: 'Cobrança', icon: '💸' }, 
   ];
 
   return (
@@ -23,7 +23,7 @@ const Sidebar = ({ setTelaAtiva, telaAtiva }) => { // Adicionei telaAtiva aqui
             onClick={() => setTelaAtiva(item.id)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 font-medium ${
               telaAtiva === item.id 
-                ? 'bg-emerald-50 text-emerald-600 shadow-sm' // Estilo para o item ativo
+                ? 'bg-emerald-50 text-emerald-600 shadow-sm'
                 : 'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'
             }`}
           >

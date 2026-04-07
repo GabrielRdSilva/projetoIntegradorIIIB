@@ -30,7 +30,7 @@ const TelaProduto = ({ produto, handleChange, handleSubmit, aoCancelar}) => {
         <Input label="% Acréscimo" type="number" name="PorcentagemAcrescidaProd" value={produto.PorcentagemAcrescidaProd} onChange={handleChange} />
         <Input label="Preço de Venda (R$)" type="number" name="ValorCorrigidoProd" value={produto.ValorCorrigidoProd} onChange={handleChange} />
 
-        {/* Usando os novos componentes de estilo */}
+
         <BadgeContainer color="emerald">
           <BadgeValue label="Custo Líq." value={`R$ ${produto.CustoProd}`} />
           <BadgeValue label="Embalagem" value={`R$ ${produto.ValorEmbalagemProd}`} />

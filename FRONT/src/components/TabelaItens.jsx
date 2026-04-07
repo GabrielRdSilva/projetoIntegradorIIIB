@@ -43,6 +43,5 @@ const TabelaItens = ({ itens, removerItem }) => {
   )
 }
 
-// ADICIONE ESTA LINHA NO FINAL:
 export default TabelaItens
 

@@ -64,7 +64,6 @@ const ListaVendas = ({ vendas, aoNovaVenda, aoDetalhar, aoEditarVenda, filtros, 
                 </div>
             </div>
 
-            {/* Tabela */}
             <div className="overflow-hidden border border-slate-200 rounded-2xl">
                 <table className="min-w-full text-left border-collapse">
                     <thead className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
@@ -85,7 +84,6 @@ const ListaVendas = ({ vendas, aoNovaVenda, aoDetalhar, aoEditarVenda, filtros, 
                                 <td className="p-4">{v.NomeCliente}</td>
                                 <td className="p-4">
                                     {(() => {
-                                        // Divide a string "YYYY-MM-DD" e cria a data usando valores locais
                                         const [ano, mes, dia] = v.DataVenda.split('T')[0].split('-');
                                         return `${dia}/${mes}/${ano}`;
                                     })()}

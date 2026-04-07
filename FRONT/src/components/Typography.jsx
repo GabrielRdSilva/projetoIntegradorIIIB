@@ -1,6 +1,5 @@
 import React from  "react"
 
-// Estilo: Cinza, pequeno, negrito, maiúsculo
 export const LabelVenda = ({ children, color = "slate" }) => {
   const colors = {
     slate: "text-slate-400",
@@ -15,8 +14,6 @@ export const LabelVenda = ({ children, color = "slate" }) => {
     </span>
   )
 }
-
-// Título das seções
 export const SectionTitle = ({ children, step }) => (
   <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
     {step && (
@@ -28,7 +25,6 @@ export const SectionTitle = ({ children, step }) => (
   </h3>
 )
 
-// VALORES MONETÁRIOS GRANDES (O que está dando erro)
 export const BigValue = ({ children, color = "slate" }) => {
   const colors = {
     slate: "text-slate-800",
@@ -43,7 +39,6 @@ export const BigValue = ({ children, color = "slate" }) => {
   )
 }
 
-// Para os valores de custo/lucro dentro daquelas caixinhas coloridas
 export const BadgeValue = ({ label, value, color = "emerald" }) => {
   const themes = {
     emerald: { bg: "bg-emerald-50/50", border: "border-emerald-100", text: "text-emerald-600" },
@@ -65,7 +60,6 @@ export const BadgeValue = ({ label, value, color = "emerald" }) => {
   )
 }
 
-// Container para agrupar as badges
 export const BadgeContainer = ({ children, color = "emerald" }) => {
   const themes = {
     emerald: "bg-emerald-50/50 border-emerald-100",

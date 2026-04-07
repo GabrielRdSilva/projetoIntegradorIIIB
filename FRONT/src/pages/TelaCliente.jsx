@@ -5,7 +5,7 @@ import Card from "../components/Card";
 import { SectionTitle } from "../components/Typography";
 
 
-// Adicione 'aoCancelar' nas props do componente
+
 const TelaCliente = ({ cliente, handleChange, handleSubmit, aoCancelar }) => {
   return (
     <Card title={cliente.id ? "Editar Cliente" : "Novo Cliente"}>
@@ -29,16 +29,11 @@ const TelaCliente = ({ cliente, handleChange, handleSubmit, aoCancelar }) => {
             <Input label="Endereço" name="Endereco" value={cliente.Endereco} onChange={handleChange} placeholder="Rua, Número, Bairro..." />
             <Input label="Referência" name="Referencia" value={cliente.Referencia} onChange={handleChange} placeholder="Perto de qual local?" />
 
-            {/*<div className="col-span-full mt-6">
-              <Button variant="success" type="submit" className="w-full py-4 text-lg">
-                Gravar Cliente no Banco
-              </Button>
-            </div>*/}
           </form>
         </Card>
 
         <div className="col-span-full mt-6 flex gap-4">
-          {/* Botão Cancelar/Voltar */}
+
           <Button
             variant="secondary"
             type="button"
@@ -62,5 +57,5 @@ const TelaCliente = ({ cliente, handleChange, handleSubmit, aoCancelar }) => {
 }
 
 
-// ESTA É A LINHA QUE ESTÁ FALTANDO:
+
 export default TelaCliente

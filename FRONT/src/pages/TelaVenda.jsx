@@ -11,13 +11,13 @@ import GeradorParcelas from "../components/GeradorParcelas";
 const TelaVenda = ({
   venda, setVenda, parcelasEditaveis,
   setParcelasEditaveis,
-  dataPrimeiraParcela, setDataPrimeiraParcela, // ADICIONE ESTAS DUAS AQUI
+  dataPrimeiraParcela, setDataPrimeiraParcela, 
   buscaCliente, setBuscaCliente, clientesFiltrados, selecionarCliente,
   exibirItens, setExibirItens,
   buscaProduto, setBuscaProduto, produtosFiltrados, selecionarProduto,
   itemAtual, setItemAtual, adicionarItem,
   itensVenda, setItensVenda,
-  // ADICIONE ESTAS NOVAS AQUI:
+
   temEntrada,
   setTemEntrada,
   dadosEntrada,
@@ -28,7 +28,7 @@ const TelaVenda = ({
   valorPagoAVista, setValorPagoAVista,
   dataPagamentoAVista, setDataPagamentoAVista,
   handleFinalizarVenda,
-  modoEdicaoVenda // Nova prop
+  modoEdicaoVenda 
 
 }) => {
 
@@ -107,8 +107,8 @@ const TelaVenda = ({
             <ResumoFinanceiro
               totalItens={totalItens}
               desconto={venda.DescontoConcedidoVenda}
-              dataPrimeiraParcela={dataPrimeiraParcela} // ADICIONE ESTA
-              setDataPrimeiraParcela={setDataPrimeiraParcela} // ADICIONE ESTA
+              dataPrimeiraParcela={dataPrimeiraParcela} 
+              setDataPrimeiraParcela={setDataPrimeiraParcela} 
               setDesconto={(val) => setVenda({ ...venda, DescontoConcedidoVenda: val })}
               tipoVenda={venda.TipoVenda}
               formaPagamento={formaPagamento}
@@ -125,7 +125,7 @@ const TelaVenda = ({
               dataPagamentoAVista={dataPagamentoAVista}
               setDataPagamentoAVista={setDataPagamentoAVista}
             />
-            {/* ESTE BLOCO É O QUE FAZ APARECER NA TELA */}
+
             {parcelasEditaveis.length > 0 && (
               <GeradorParcelas
                 parcelas={parcelasEditaveis}

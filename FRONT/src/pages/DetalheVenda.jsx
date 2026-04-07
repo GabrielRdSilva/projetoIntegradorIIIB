@@ -5,7 +5,6 @@ const DetalheVenda = ({ venda, aoVoltar }) => {
     return <p className="text-slate-500 text-center py-10">Nenhuma venda selecionada para detalhamento.</p>;
   }
 
-  // Função auxiliar para formatar a data sem erro de fuso horário
   const formatarDataLocal = (dataStr) => {
     if (!dataStr) return "";
     const [ano, mes, dia] = dataStr.split('T')[0].split('-');
@@ -25,7 +24,6 @@ const DetalheVenda = ({ venda, aoVoltar }) => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        {/* Informações da Venda */}
         <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
           <h3 className="text-lg font-bold text-slate-800 mb-4">Informações Gerais</h3>
           <p className="mb-2"><strong>Data da Venda:</strong> {formatarDataLocal(venda.DataVenda)}</p>
@@ -37,8 +35,6 @@ const DetalheVenda = ({ venda, aoVoltar }) => {
             </span>
           </p>
         </div>
-
-        {/* Informações do Cliente */}
         <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
           <h3 className="text-lg font-bold text-slate-800 mb-4">Dados do Cliente</h3>
           <p className="mb-2"><strong>Cód. Cliente:</strong> {venda.CodigoCliente}</p>
@@ -46,8 +42,6 @@ const DetalheVenda = ({ venda, aoVoltar }) => {
           <p><strong>Referência:</strong> {venda.ReferenciaCliente}</p>
         </div>
       </div>
-
-      {/* Itens da Venda */}
       <div className="mb-8">
         <h3 className="text-lg font-bold text-slate-800 mb-4">Itens da Venda</h3>
         {venda.itens && venda.itens.length > 0 ? (
@@ -82,8 +76,6 @@ const DetalheVenda = ({ venda, aoVoltar }) => {
           <p className="text-slate-500 bg-slate-50 p-4 rounded-xl text-center border border-dashed">Nenhum item registrado nesta venda.</p>
         )}
       </div>
-
-      {/* Resumo Financeiro */}
       <div className="bg-emerald-50/50 p-6 rounded-2xl border border-emerald-100 mb-6">
         <h3 className="text-lg font-bold text-slate-800 mb-4">Resumo Financeiro</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -101,8 +93,6 @@ const DetalheVenda = ({ venda, aoVoltar }) => {
           </div>
         </div>
       </div>
-
-      {/* Informações de Pagamento */}
       <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100">
         <h3 className="text-lg font-bold text-slate-800 mb-4">Informações de Pagamento</h3>
         <p className="mb-2"><strong>Forma de Pagamento:</strong> {venda.FormaPagamento}</p>

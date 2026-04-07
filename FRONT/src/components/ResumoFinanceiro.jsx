@@ -8,10 +8,10 @@ const ResumoFinanceiro = ({
   desconto, 
   setDesconto, 
   tipoVenda, 
-  numeroParcelas, // Adicionado de volta
-  setNumeroParcelas, // Adicionado de volta
-  dataPrimeiraParcela, // Adicionado de volta
-  setDataPrimeiraParcela, // Adicionado de volta
+  numeroParcelas, 
+  setNumeroParcelas, 
+  dataPrimeiraParcela, 
+  setDataPrimeiraParcela, 
   temEntrada, 
   setTemEntrada, 
   dadosEntrada, 
@@ -23,8 +23,6 @@ const ResumoFinanceiro = ({
   return (
     <div className="mt-10 pt-6 border-t border-slate-100">
       <SectionTitle step="3">Resumo Financeiro</SectionTitle>
-
-      {/* 1. BLOCO DE TOTAIS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-emerald-50/50 p-6 rounded-2xl border border-emerald-100 mb-6">
         <div className="flex flex-col">
           <LabelVenda color="emerald">Subtotal</LabelVenda>
@@ -47,8 +45,6 @@ const ResumoFinanceiro = ({
           <BigValue color="orange">R$ {totalFinal.toFixed(2)}</BigValue>
         </div>
       </div>
-
-      {/* 2. CONFIGURAÇÃO DE PARCELAMENTO (Aparece se for A Prazo) */}
       {tipoVenda === 'A Prazo' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 bg-slate-50 p-6 rounded-2xl border border-slate-200">
           <div className="flex flex-col gap-2">
@@ -72,8 +68,6 @@ const ResumoFinanceiro = ({
           </div>
         </div>
       )}
-
-      {/* 3. BOTÕES DE AÇÃO FINANCEIRA */}
       <div className="flex flex-wrap gap-4 mb-6">
         <Button 
           type="button" 
@@ -93,8 +87,6 @@ const ResumoFinanceiro = ({
           ⚙️ Gerar Parcelas
         </Button>
       </div>
-
-      {/* 4. QUADRO DE ENTRADA (Apenas se ativado) */}
       {temEntrada && (
         <div className="p-6 bg-white rounded-2xl border-2 border-emerald-200 shadow-md mb-6">
           <div className="flex items-center gap-2 mb-4 text-emerald-600 font-bold uppercase tracking-widest text-xs">
